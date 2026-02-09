@@ -1,0 +1,18 @@
+# IDE
+.idea/
+.vs/
+*.sln
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SG build artifacts
+SourceGenerator~/bin/
+SourceGenerator~/obj/
+SourceGenerator~/SgTest/bin/
+SourceGenerator~/SgTest/obj/
+SourceGenerator~/SgTest/coverage/
+SourceGenerator~/.idea/

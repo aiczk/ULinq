@@ -1,0 +1,26 @@
+{
+    "name": "ULinqTests.Editor",
+    "rootNamespace": "",
+    "references": [
+        "UdonSharp.Editor",
+        "UdonSharp.Runtime",
+        "VRC.Udon",
+        "VRC.Udon.Editor",
+        "VRC.SDK3",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

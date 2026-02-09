@@ -1,0 +1,23 @@
+{
+  "name": "com.aiczk.ulinq",
+  "displayName": "ULinq",
+  "version": "1.0.0",
+  "unity": "2022.3",
+  "description": "LINQ-style array operations for UdonSharp. Lambdas are expanded at compile time by Source Generator — zero runtime cost.",
+  "license": "MIT",
+  "author": {
+    "name": "aiczk",
+    "url": "https://github.com/aiczk"
+  },
+  "url": "https://github.com/aiczk/ULinq",
+  "changelogUrl": "https://github.com/aiczk/ULinq/blob/main/CHANGELOG.md",
+  "documentationUrl": "https://github.com/aiczk/ULinq#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aiczk/ULinq.git"
+  },
+  "vpmDependencies": {
+    "com.vrchat.worlds": ">=3.5.0"
+  },
+  "keywords": ["vrchat", "udonsharp", "linq", "source-generator"]
+}

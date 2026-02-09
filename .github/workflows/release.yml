@@ -1,0 +1,34 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version from package.json
+        id: version
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Create release zip
+        run: |
+          zip -r "ULinq-${{ steps.version.outputs.version }}.zip" . \
+            -x "SourceGenerator~/*" \
+            -x "Tests/*" \
+            -x ".github/*" \
+            -x ".gitignore" \
+            -x "CHANGELOG.md"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ULinq ${{ steps.version.outputs.version }}
+          files: |
+            ULinq-${{ steps.version.outputs.version }}.zip
+            package.json
