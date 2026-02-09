@@ -17,10 +17,13 @@ jobs:
         run: |
           zip -r "ULinq-${{ github.ref_name }}.zip" . \
             -x "SourceGenerator~/*" \
-            -x "Tests/*" \
+            -x "Tests/*" "Tests.meta" \
             -x ".github/*" \
             -x ".gitignore" \
-            -x "CHANGELOG.md"
+            -x ".gitattributes" \
+            -x ".editorconfig" \
+            -x "CHANGELOG.md" "CHANGELOG.md.meta" \
+            -x "CONTRIBUTING.md" "CONTRIBUTING.md.meta"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

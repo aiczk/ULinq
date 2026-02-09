@@ -36,9 +36,66 @@ namespace UdonLambda.Editor
         private static Dictionary<string, string> _expandedFileNameMap;
         private static bool _patched;
 
+        // Fixed GUIDs for runtime files copied to Assets/ (VPM install).
+        // Users may move these files freely — we track by GUID, not path.
+        private static readonly (string fileName, string guid)[] RuntimeFiles =
+        {
+            ("InlineAttribute.cs", "f47ac10b58cc4372a5670e02b2c3d479"),
+            ("ULinq.cs",           "8e3d5b6a9c1f4d7e2a0b8c5d6f3e4a71"),
+        };
+
         static UdonLambdaCompilerHook()
         {
+            EnsureRuntimeInAssets();
             PatchReadFileTextSync();
+        }
+
+        /// <summary>
+        /// VPM installs to Packages/ where code without asmdef won't compile.
+        /// Copy Runtime/*.cs to Assets/ so they join Assembly-CSharp,
+        /// where the SG can read [Inline] method bodies.
+        /// Files are tracked by GUID — users can move them anywhere under Assets/.
+        /// </summary>
+        private static void EnsureRuntimeInAssets()
+        {
+            var info = UnityEditor.PackageManager.PackageInfo.FindForAssembly(
+                typeof(UdonLambdaCompilerHook).Assembly);
+            if (info == null) return; // Running from Assets/ — no copy needed
+
+            var srcDir = Path.Combine(info.resolvedPath, "Runtime");
+            if (!Directory.Exists(srcDir)) return;
+
+            var needsRefresh = false;
+            foreach (var (fileName, guid) in RuntimeFiles)
+            {
+                var src = Path.Combine(srcDir, fileName);
+                if (!File.Exists(src)) continue;
+
+                var existing = AssetDatabase.GUIDToAssetPath(guid);
+                string dst;
+                if (!string.IsNullOrEmpty(existing) && File.Exists(existing))
+                {
+                    dst = existing; // user may have moved it — update in place
+                }
+                else
+                {
+                    const string defaultDir = "Assets/ULinqRuntime";
+                    Directory.CreateDirectory(defaultDir);
+                    dst = Path.Combine(defaultDir, fileName).Replace('\\', '/');
+                    File.WriteAllText(dst + ".meta",
+                        $"fileFormatVersion: 2\nguid: {guid}\nMonoImporter:\n  serializedVersion: 2\n  defaultReferences: []\n  executionOrder: 0\n  icon: {{instanceID: 0}}\n");
+                }
+
+                var srcText = File.ReadAllText(src);
+                if (!File.Exists(dst) || File.ReadAllText(dst) != srcText)
+                {
+                    File.WriteAllText(dst, srcText);
+                    needsRefresh = true;
+                }
+            }
+
+            if (needsRefresh)
+                EditorApplication.delayCall += AssetDatabase.Refresh;
         }
 
         private static void PatchReadFileTextSync()
