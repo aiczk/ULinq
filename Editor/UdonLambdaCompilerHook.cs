@@ -44,6 +44,10 @@ namespace UdonLambda.Editor
             ("ULinq.cs",           "8e3d5b6a9c1f4d7e2a0b8c5d6f3e4a71"),
         };
 
+        // SG DLL must also be in Assets/ — Packages/ analyzers are not applied to Assembly-CSharp
+        private const string SgDllName = "UdonLambda.SourceGenerator.dll";
+        private const string SgDllGuid = "a1b2c3d4e5f647890123456789abcdef";
+
         static UdonLambdaCompilerHook()
         {
             EnsureRuntimeInAssets();
@@ -79,7 +83,7 @@ namespace UdonLambda.Editor
                 }
                 else
                 {
-                    const string defaultDir = "Assets/ULinqRuntime";
+                    const string defaultDir = "Assets/ULinq/Runtime";
                     Directory.CreateDirectory(defaultDir);
                     dst = Path.Combine(defaultDir, fileName).Replace('\\', '/');
                     File.WriteAllText(dst + ".meta",
@@ -90,6 +94,38 @@ namespace UdonLambda.Editor
                 if (!File.Exists(dst) || File.ReadAllText(dst) != srcText)
                 {
                     File.WriteAllText(dst, srcText);
+                    needsRefresh = true;
+                }
+            }
+
+            // Copy SG DLL to Assets/ — Packages/ analyzers are not applied to Assembly-CSharp
+            var sgSrc = Path.Combine(info.resolvedPath, "Plugins", SgDllName);
+            if (File.Exists(sgSrc))
+            {
+                var sgExisting = AssetDatabase.GUIDToAssetPath(SgDllGuid);
+                string sgDst;
+                if (!string.IsNullOrEmpty(sgExisting) && File.Exists(sgExisting))
+                {
+                    sgDst = sgExisting;
+                }
+                else
+                {
+                    const string defaultDir = "Assets/ULinq/Plugins";
+                    Directory.CreateDirectory(defaultDir);
+                    sgDst = Path.Combine(defaultDir, SgDllName).Replace('\\', '/');
+                    // Copy .meta from package, replacing GUID to avoid collision
+                    var metaSrc = sgSrc + ".meta";
+                    if (File.Exists(metaSrc))
+                    {
+                        var meta = File.ReadAllText(metaSrc);
+                        meta = Regex.Replace(meta, @"(?<=guid: )\w+", SgDllGuid);
+                        File.WriteAllText(sgDst + ".meta", meta);
+                    }
+                }
+
+                if (!File.Exists(sgDst) || new FileInfo(sgSrc).Length != new FileInfo(sgDst).Length)
+                {
+                    File.Copy(sgSrc, sgDst, true);
                     needsRefresh = true;
                 }
             }

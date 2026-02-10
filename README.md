@@ -104,7 +104,7 @@ public class SumExample : UdonSharpBehaviour
 5. **Add Component** → **SumExample**
 6. Enter Play Mode — you should see `Sum of evens: 30` in the Console
 
-> When installed via VCC, an `Assets/ULinqRuntime/` folder is created automatically on the first domain reload. You may move this folder anywhere under `Assets/`.
+> When installed via VCC, an `Assets/ULinq/` folder is created automatically on the first domain reload containing `Runtime/` and `Plugins/`. You may move these files anywhere under `Assets/`.
 
 ## API Reference
 
