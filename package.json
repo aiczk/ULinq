@@ -1,7 +1,7 @@
 {
   "name": "com.aiczk.ulinq",
   "displayName": "ULinq",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "unity": "2022.3",
   "description": "LINQ-style array operations for UdonSharp. Lambdas are expanded at compile time by Source Generator — zero runtime cost.",
   "license": "MIT",

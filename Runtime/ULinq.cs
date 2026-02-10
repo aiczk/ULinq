@@ -1081,8 +1081,8 @@ namespace ULinq
         [Inline]
         public static void ForEach(this DataList list, Action<DataToken> action)
         {
-            foreach (var t in list)
-                action(t);
+            for (var __i = 0; __i < list.Count; __i++)
+                action(list[__i]);
         }
 
         /// <summary>Filters elements by a predicate.</summary>
@@ -1090,8 +1090,9 @@ namespace ULinq
         public static DataList Where(this DataList list, Func<DataToken, bool> predicate)
         {
             var result = new DataList();
-            foreach (var t in list)
+            for (var __i = 0; __i < list.Count; __i++)
             {
+                var t = list[__i];
                 if (!predicate(t)) continue;
                 result.Add(t);
             }
@@ -1103,8 +1104,9 @@ namespace ULinq
         public static bool Any(this DataList list, Func<DataToken, bool> predicate)
         {
             var result = false;
-            foreach (var t in list)
+            for (var __i = 0; __i < list.Count; __i++)
             {
+                var t = list[__i];
                 if (!predicate(t)) continue;
                 result = true;
                 break;
@@ -1117,8 +1119,9 @@ namespace ULinq
         public static bool All(this DataList list, Func<DataToken, bool> predicate)
         {
             var result = true;
-            foreach (var t in list)
+            for (var __i = 0; __i < list.Count; __i++)
             {
+                var t = list[__i];
                 if (predicate(t)) continue;
                 result = false;
                 break;
@@ -1131,8 +1134,9 @@ namespace ULinq
         public static int Count(this DataList list, Func<DataToken, bool> predicate)
         {
             var count = 0;
-            foreach (var t in list)
+            for (var __i = 0; __i < list.Count; __i++)
             {
+                var t = list[__i];
                 if (!predicate(t)) continue;
                 count++;
             }
@@ -1144,8 +1148,9 @@ namespace ULinq
         public static DataToken FirstOrDefault(this DataList list, Func<DataToken, bool> predicate)
         {
             var result = default(DataToken);
-            foreach (var t in list)
+            for (var __i = 0; __i < list.Count; __i++)
             {
+                var t = list[__i];
                 if (!predicate(t)) continue;
                 result = t;
                 break;
@@ -1160,8 +1165,8 @@ namespace ULinq
         public static DataList Select(this DataList list, Func<DataToken, DataToken> func)
         {
             var result = new DataList();
-            foreach (var t in list)
-                result.Add(func(t));
+            for (var __i = 0; __i < list.Count; __i++)
+                result.Add(func(list[__i]));
             return result;
         }
 
@@ -1172,8 +1177,9 @@ namespace ULinq
         {
             var result = default(DataToken);
             var found = false;
-            foreach (var t in list)
+            for (var __i = 0; __i < list.Count; __i++)
             {
+                var t = list[__i];
                 if (!predicate(t)) continue;
                 result = t;
                 found = true;
@@ -1222,8 +1228,9 @@ namespace ULinq
         {
             var result = default(DataToken);
             var count = 0;
-            foreach (var t in list)
+            for (var __i = 0; __i < list.Count; __i++)
             {
+                var t = list[__i];
                 if (!predicate(t)) continue;
                 result = t;
                 count++;
@@ -1239,8 +1246,9 @@ namespace ULinq
         {
             var result = default(DataToken);
             var count = 0;
-            foreach (var t in list)
+            for (var __i = 0; __i < list.Count; __i++)
             {
+                var t = list[__i];
                 if (!predicate(t)) continue;
                 result = t;
                 count++;
@@ -1254,8 +1262,8 @@ namespace ULinq
         public static DataToken Aggregate(this DataList list, DataToken seed, Func<DataToken, DataToken, DataToken> func)
         {
             var result = seed;
-            foreach (var t in list)
-                result = func(result, t);
+            for (var __i = 0; __i < list.Count; __i++)
+                result = func(result, list[__i]);
             return result;
         }
 
@@ -1264,8 +1272,9 @@ namespace ULinq
         public static DataList TakeWhile(this DataList list, Func<DataToken, bool> predicate)
         {
             var result = new DataList();
-            foreach (var t in list)
+            for (var __i = 0; __i < list.Count; __i++)
             {
+                var t = list[__i];
                 if (!predicate(t)) break;
                 result.Add(t);
             }
@@ -1278,8 +1287,9 @@ namespace ULinq
         {
             var result = new DataList();
             var skipping = true;
-            foreach (var t in list)
+            for (var __i = 0; __i < list.Count; __i++)
             {
+                var t = list[__i];
                 if (skipping && predicate(t)) continue;
                 skipping = false;
                 result.Add(t);
@@ -1379,10 +1389,10 @@ namespace ULinq
         public static DataList Concat(this DataList list, DataList other)
         {
             var result = new DataList();
-            foreach (var t in list)
-                result.Add(t);
-            foreach (var t in other)
-                result.Add(t);
+            for (var __i = 0; __i < list.Count; __i++)
+                result.Add(list[__i]);
+            for (var __i = 0; __i < other.Count; __i++)
+                result.Add(other[__i]);
             return result;
         }
 
@@ -1391,8 +1401,8 @@ namespace ULinq
         public static DataList Append(this DataList list, DataToken value)
         {
             var result = new DataList();
-            foreach (var t in list)
-                result.Add(t);
+            for (var __i = 0; __i < list.Count; __i++)
+                result.Add(list[__i]);
             result.Add(value);
             return result;
         }
@@ -1403,8 +1413,8 @@ namespace ULinq
         {
             var result = new DataList();
             result.Add(value);
-            foreach (var t in list)
-                result.Add(t);
+            for (var __i = 0; __i < list.Count; __i++)
+                result.Add(list[__i]);
             return result;
         }
 
@@ -1413,12 +1423,13 @@ namespace ULinq
         public static DataList Distinct(this DataList list)
         {
             var result = new DataList();
-            foreach (var t1 in list)
+            for (var __i = 0; __i < list.Count; __i++)
             {
+                var t1 = list[__i];
                 var found = false;
-                foreach (var t in result)
+                for (var __j = 0; __j < result.Count; __j++)
                 {
-                    if (!t1.Equals(t)) continue;
+                    if (!t1.Equals(result[__j])) continue;
                     found = true;
                     break;
                 }

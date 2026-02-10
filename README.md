@@ -77,6 +77,35 @@ Assets/
 
 > **Note:** `Runtime/` must NOT have an assembly definition. The Source Generator needs `[Inline]` method bodies and user code in the same compilation unit (Assembly-CSharp). This is a Roslyn SG limitation — it can only read syntax trees from the current compilation.
 
+## Quick Start
+
+1. Install ULinq (see above)
+2. In Unity, right-click the Project window → **Create** → **U# Script**, name it `SumExample`
+3. Replace the contents:
+
+```csharp
+using UdonSharp;
+using ULinq;
+using UnityEngine;
+
+public class SumExample : UdonSharpBehaviour
+{
+    void Start()
+    {
+        int[] numbers = new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+        int[] evens = numbers.Where(x => x % 2 == 0);
+        int sum = evens.Aggregate(0, (acc, x) => acc + x);
+        Debug.Log("Sum of evens: " + sum); // 30
+    }
+}
+```
+
+4. Create an empty **GameObject** in your scene
+5. **Add Component** → **SumExample**
+6. Enter Play Mode — you should see `Sum of evens: 30` in the Console
+
+> When installed via VCC, an `Assets/ULinqRuntime/` folder is created automatically on the first domain reload. You may move this folder anywhere under `Assets/`.
+
 ## API Reference
 
 ### Lambda Operators
