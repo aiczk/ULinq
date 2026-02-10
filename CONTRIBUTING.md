@@ -22,20 +22,20 @@ Assets/ULinq/
 
 ```bash
 cd Assets/ULinq/SourceGenerator~
-dotnet build UdonLambda.SourceGenerator.csproj -c Release
+dotnet build ULinq.SourceGenerator.csproj -c Release
 ```
 
 Copy the built DLL to `Plugins/`:
 
 ```bash
-cp bin/Release/netstandard2.0/UdonLambda.SourceGenerator.dll ../Plugins/
+cp bin/Release/netstandard2.0/ULinq.SourceGenerator.dll ../Plugins/
 ```
 
 **Verify the hash matches** — Bee silently ignores DLLs that don't match:
 
 ```bash
-md5sum ../Plugins/UdonLambda.SourceGenerator.dll
-md5sum bin/Release/netstandard2.0/UdonLambda.SourceGenerator.dll
+md5sum ../Plugins/ULinq.SourceGenerator.dll
+md5sum bin/Release/netstandard2.0/ULinq.SourceGenerator.dll
 ```
 
 After copying, touch a `.cs` file's **content** (not just timestamp) to invalidate Bee's cache.

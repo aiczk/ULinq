@@ -231,7 +231,7 @@ DataList .Distinct()          DataList .SequenceEqual(other)
 
 1. Roslyn SG detects `[Inline]` method calls with lambda arguments
 2. Rewrites each call site into expanded loops with unique variable names
-3. Writes expanded `.cs` to `Temp/UdonLambdaGenerated/`
+3. Writes expanded `.cs` to `Temp/ULinqGenerated/`
 4. Harmony postfix on `UdonSharpUtils.ReadFileTextSync` returns the expanded source
 5. UdonSharp compiles lambda-free code into Udon bytecode
 
@@ -240,7 +240,7 @@ DataList .Distinct()          DataList .SequenceEqual(other)
 Any static extension method with `[Inline]` is automatically expanded:
 
 ```csharp
-using UdonLambda;
+using ULinq;
 
 public static class MyExtensions
 {
@@ -274,7 +274,7 @@ The SG inlines the method body at each call site, replacing `predicate(t)` with 
 ## Troubleshooting
 
 **Q: UdonSharp errors like "does not support ... SimpleLambdaExpression"**
-A: The Source Generator DLL is not being loaded. Check that `Plugins/UdonLambda.SourceGenerator.dll.meta` has `labels: [RoslynAnalyzer]` at the top level (not inside `PluginImporter:`). Reimport the DLL in Unity.
+A: The Source Generator DLL is not being loaded. Check that `Plugins/ULinq.SourceGenerator.dll.meta` has `labels: [RoslynAnalyzer]` at the top level (not inside `PluginImporter:`). Reimport the DLL in Unity.
 
 **Q: Changes to `[Inline]` methods are not reflected**
 A: After rebuilding the SG DLL, copy it to `Plugins/` and verify the MD5 hash matches. Then change the **content** of any `.cs` file (not just timestamp) to invalidate Bee's cache.

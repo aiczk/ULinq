@@ -7,9 +7,7 @@ public class ULinqEditorTests
 {
     static readonly FieldInfo AssemblyErrorField = FindAssemblyErrorField();
 
-    [Test] public void Basic_Compiles() => AssertScriptCompiles("ULinqTestBasic");
-    [Test] public void Chain_Compiles() => AssertScriptCompiles("ULinqTestChain");
-    [Test] public void ExprBodied_Compiles() => AssertScriptCompiles("ULinqTestExprBodied");
+    [Test] public void ULinqTestBasic_Compiles() => AssertScriptCompiles("ULinqTest");
 
     static void AssertScriptCompiles(string scriptName)
     {

@@ -1,6 +1,6 @@
 {
-    "name": "UdonLambda.Editor",
-    "rootNamespace": "UdonLambda.Editor",
+    "name": "ULinq.Editor",
+    "rootNamespace": "ULinq.Editor",
     "references": [
         "GUID:84265b35cca3905448e623ef3903f0ff"
     ],

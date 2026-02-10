@@ -5,9 +5,9 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace UdonLambda.SourceGenerator;
+namespace ULinq.SourceGenerator;
 
-internal sealed class UdonLambdaRewriter : CSharpSyntaxRewriter
+internal sealed class ULinqRewriter : CSharpSyntaxRewriter
 {
     readonly SemanticModel _model;
     readonly Dictionary<IMethodSymbol, InlineMethodInfo> _inlineBySymbol;
@@ -20,7 +20,7 @@ internal sealed class UdonLambdaRewriter : CSharpSyntaxRewriter
     public IReadOnlyList<MemberDeclarationSyntax> GeneratedMethods => _generatedMethods;
     public ImmutableArray<Diagnostic> CollectedDiagnostics => _diagnostics.ToImmutableArray();
 
-    public UdonLambdaRewriter(SemanticModel model, List<InlineMethodInfo> inlineMethods)
+    public ULinqRewriter(SemanticModel model, List<InlineMethodInfo> inlineMethods)
     {
         _model = model;
         _inlineBySymbol = new Dictionary<IMethodSymbol, InlineMethodInfo>(SymbolEqualityComparer.Default);
@@ -301,6 +301,13 @@ internal sealed class UdonLambdaRewriter : CSharpSyntaxRewriter
         }
         else if (!IsSimpleReceiver(receiver))
         {
+            // Visit receiver to expand any nested inline calls (e.g. nums.Reverse()[0])
+            receiver = (ExpressionSyntax)Visit(receiver);
+            if (_pendingStatements.Count > 0)
+            {
+                prefixStatements.AddRange(_pendingStatements);
+                _pendingStatements.Clear();
+            }
             var tempName = $"__receiver_{_counter.Next()}";
             prefixStatements.Add(SyntaxFactory.ParseStatement(
                 $"var {tempName} = {receiver.NormalizeWhitespace().ToFullString()};"));
@@ -327,11 +334,15 @@ internal sealed class UdonLambdaRewriter : CSharpSyntaxRewriter
         var (delegateArgs, delegateTypeInfos, delegateCaptures, valueParamNames, valueParamExprs) =
             BuildParameterMappings(methodParams, callArgs, invocation);
 
+        var returnTypeName = _model.GetSymbolInfo(invocation).Symbol is IMethodSymbol resolvedForType
+            ? (resolvedForType.ReturnsVoid ? "void" : resolvedForType.ReturnType.ToDisplayString())
+            : "object";
+
         var expansion = ProcessMethodBody(
             methodBody, receiver, receiverParam.Name,
             delegateArgs, delegateTypeInfos, delegateCaptures,
             valueParamNames, valueParamExprs, typeParamMap,
-            invocation.GetLocation());
+            invocation.GetLocation(), returnTypeName);
 
         prefixStatements.AddRange(expansion.Statements);
         return new InlineExpansion(prefixStatements, expansion.ReturnExpression);
@@ -347,7 +358,8 @@ internal sealed class UdonLambdaRewriter : CSharpSyntaxRewriter
         List<string> valueParamNames,
         List<ExpressionSyntax> valueParamExprs,
         Dictionary<string, string> typeParamMap,
-        Location location)
+        Location location,
+        string returnTypeName)
     {
         if (typeParamMap.Count > 0)
             methodBody = (BlockSyntax)new TypeParameterReplacer(typeParamMap).Visit(methodBody);
@@ -357,9 +369,20 @@ internal sealed class UdonLambdaRewriter : CSharpSyntaxRewriter
         if (valueParamNames.Count > 0)
             renamedBody = (BlockSyntax)new ParameterReplacer(valueParamNames, valueParamExprs.ToArray()).Visit(renamedBody);
 
+        // Convert early returns (if/return patterns) to result-variable assignments
+        if (returnTypeName != "void" && HasEarlyReturn(renamedBody.Statements))
+        {
+            var rv = $"__result_{_counter.Next()}";
+            var converted = new List<StatementSyntax>();
+            converted.Add(SyntaxFactory.ParseStatement($"{returnTypeName} {rv} = default;"));
+            converted.AddRange(ConvertEarlyReturns(renamedBody.Statements, rv));
+            converted.Add(SyntaxFactory.ParseStatement($"return {rv};"));
+            renamedBody = SyntaxFactory.Block(converted);
+        }
+
         var inliner = new LambdaInliner(
             receiverParamName,
-            receiver.ToFullString().Trim(),
+            receiver,
             delegateArgs,
             _counter,
             delegateTypeInfos,
@@ -392,6 +415,87 @@ internal sealed class UdonLambdaRewriter : CSharpSyntaxRewriter
 
         return new InlineExpansion(statements, returnExpr);
     }
+
+    /// <summary>Returns true if any non-last top-level statement contains a return.</summary>
+    static bool HasEarlyReturn(SyntaxList<StatementSyntax> statements)
+    {
+        for (int i = 0; i < statements.Count - 1; i++)
+        {
+            if (statements[i] is ReturnStatementSyntax) return true;
+            if (statements[i].DescendantNodes().OfType<ReturnStatementSyntax>().Any()) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Converts early returns into result-variable assignments with if/else nesting.
+    /// <c>if (c) return A; stmts; return B;</c> → <c>if (c) { rv = A; } else { stmts; rv = B; }</c>
+    /// </summary>
+    static List<StatementSyntax> ConvertEarlyReturns(SyntaxList<StatementSyntax> stmts, string rv)
+        => ConvertEarlyReturns(stmts.ToArray(), rv);
+
+    static List<StatementSyntax> ConvertEarlyReturns(IReadOnlyList<StatementSyntax> stmts, string rv)
+    {
+        var result = new List<StatementSyntax>();
+        for (int i = 0; i < stmts.Count; i++)
+        {
+            if (stmts[i] is ReturnStatementSyntax ret && ret.Expression != null)
+            {
+                result.Add(AssignResult(rv, ret.Expression));
+                break;
+            }
+
+            if (stmts[i] is IfStatementSyntax ifStmt
+                && ifStmt.DescendantNodes().OfType<ReturnStatementSyntax>().Any())
+            {
+                var remaining = new List<StatementSyntax>();
+                for (int j = i + 1; j < stmts.Count; j++) remaining.Add(stmts[j]);
+
+                var thenBranch = ConvertBranch(ifStmt.Statement, rv);
+                StatementSyntax elseBranch;
+                if (ifStmt.Else != null)
+                {
+                    elseBranch = ConvertBranch(ifStmt.Else.Statement, rv);
+                    if (remaining.Count > 0
+                        && !ifStmt.Else.Statement.DescendantNodesAndSelf()
+                            .OfType<ReturnStatementSyntax>().Any())
+                    {
+                        var combined = elseBranch is BlockSyntax eb
+                            ? eb.Statements.ToList()
+                            : new List<StatementSyntax> { elseBranch };
+                        combined.AddRange(ConvertEarlyReturns(remaining, rv));
+                        elseBranch = SyntaxFactory.Block(combined);
+                    }
+                }
+                else
+                {
+                    elseBranch = SyntaxFactory.Block(ConvertEarlyReturns(remaining, rv));
+                }
+
+                result.Add(ifStmt.WithStatement(thenBranch)
+                    .WithElse(SyntaxFactory.ElseClause(elseBranch)));
+                break;
+            }
+
+            result.Add(stmts[i]);
+        }
+        return result;
+    }
+
+    static StatementSyntax ConvertBranch(StatementSyntax stmt, string rv)
+    {
+        if (stmt is ReturnStatementSyntax ret && ret.Expression != null)
+            return SyntaxFactory.Block(AssignResult(rv, ret.Expression));
+        if (stmt is BlockSyntax block)
+            return SyntaxFactory.Block(ConvertEarlyReturns(block.Statements, rv));
+        if (stmt is IfStatementSyntax ifStmt)
+            return SyntaxFactory.Block(ConvertEarlyReturns(new StatementSyntax[] { ifStmt }, rv));
+        return stmt;
+    }
+
+    static ExpressionStatementSyntax AssignResult(string rv, ExpressionSyntax value)
+        => SyntaxFactory.ExpressionStatement(SyntaxFactory.AssignmentExpression(
+            SyntaxKind.SimpleAssignmentExpression, SyntaxFactory.IdentifierName(rv), value));
 
     (Dictionary<string, ExpressionSyntax> delegateArgs,
      Dictionary<string, DelegateTypeInfo> delegateTypeInfos,

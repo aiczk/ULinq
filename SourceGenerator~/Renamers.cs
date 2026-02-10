@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace UdonLambda.SourceGenerator;
+namespace ULinq.SourceGenerator;
 
 /// <summary>
 /// Scope-aware variable renamer. Each for/foreach introduces a new scope;
@@ -123,10 +123,17 @@ internal sealed class TypeParameterReplacer : CSharpSyntaxRewriter
 
     public override SyntaxNode VisitIdentifierName(IdentifierNameSyntax node)
     {
-        if (_typeMap.TryGetValue(node.Identifier.Text, out var concreteType))
+        if (_typeMap.TryGetValue(node.Identifier.Text, out var concreteType) && IsTypeContext(node))
             return SyntaxFactory.IdentifierName(concreteType).WithTriviaFrom(node);
         return base.VisitIdentifierName(node);
     }
+
+    static bool IsTypeContext(IdentifierNameSyntax node) => node.Parent is
+        ArrayTypeSyntax or DefaultExpressionSyntax or TypeOfExpressionSyntax or
+        CastExpressionSyntax or TypeArgumentListSyntax or ObjectCreationExpressionSyntax or
+        NullableTypeSyntax or QualifiedNameSyntax
+        || (node.Parent is VariableDeclarationSyntax vd && vd.Type == node)
+        || (node.Parent is ParameterSyntax p && p.Type == node);
 }
 
 /// <summary>Replaces lambda parameter identifiers with the actual argument expressions.</summary>

@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.0.3] - 2026-02-11
+
+### Changed
+- Renamed all internal identifiers from `UdonLambda` to `ULinq` (namespace, DLL, asmdef, Harmony ID, temp directory)
+- `InlineAttribute` namespace: `UdonLambda` → `ULinq`
+- `Where` / `Where` (indexed): two-pass algorithm eliminates over-allocated temp array
+- `TakeWhile` / `SkipWhile`: direct array access eliminates temp array
+- DataList method variables: `__i` / `__j` → `i` / `j` for readability
+
+### Added
+- Early return conversion: `[Inline]` methods can now use `if (cond) return A; return B;` patterns
+- `TestAssert.Eq<T>`: generic `[Inline]` test assertion helper
+- `ULinqArrayValueTests`: reflection-based runtime value tests for all operators
+- SG diagnostics: UL0003 (disk write failure), UL0004 (class processing failure)
+- Warning when `Temp/ULinqGenerated/` is missing (helps diagnose SG DLL not loaded)
+
+### Fixed
+- SG `WriteToDisk` now derives absolute path from `SyntaxTree.FilePath` (fixes potential CWD mismatch)
+- Replaced all silent `catch {}` with diagnostic reporting or `Debug.LogWarning`
+- `LambdaInliner`: receiver parameter changed from `string` to `ExpressionSyntax` (avoids redundant parsing)
+
 ## [1.0.0] - 2026-02-09
 
 ### Lambda Operators (Array)

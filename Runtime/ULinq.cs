@@ -1,5 +1,5 @@
+// Expanded code is written to Temp/ULinqGenerated/ — inspect those files to see the SG output.
 using System;
-using UdonLambda;
 using VRC.SDK3.Data;
 
 namespace ULinq
@@ -35,20 +35,24 @@ namespace ULinq
         /// <param name="array">The source array.</param>
         /// <param name="predicate">A function that returns <c>true</c> for elements to include.</param>
         /// <returns>An array containing only elements that satisfy the predicate.</returns>
+        /// <remarks>Predicate is evaluated twice (count pass + fill pass). Avoid predicates with side effects.</remarks>
         [Inline]
         public static T[] Where<T>(this T[] array, Func<T, bool> predicate)
         {
-            var temp = new T[array.Length];
             var count = 0;
             foreach (var t in array)
             {
                 if (!predicate(t)) continue;
-                temp[count] = t;
                 count++;
             }
             var result = new T[count];
-            for (var i = 0; i < count; i++)
-                result[i] = temp[i];
+            var idx = 0;
+            foreach (var t in array)
+            {
+                if (!predicate(t)) continue;
+                result[idx] = t;
+                idx++;
+            }
             return result;
         }
 
@@ -517,7 +521,7 @@ namespace ULinq
                 found = true;
                 break;
             }
-            if (!found) result = array[array.Length];
+            if (!found) result = array[array.Length]; // UdonSharp lacks throw — intentional IndexOutOfRangeException
             return result;
         }
 
@@ -544,7 +548,7 @@ namespace ULinq
                 found = true;
                 break;
             }
-            if (!found) result = array[array.Length];
+            if (!found) result = array[array.Length]; // UdonSharp lacks throw — intentional IndexOutOfRangeException
             return result;
         }
 
@@ -564,7 +568,7 @@ namespace ULinq
         [Inline]
         public static T Single<T>(this T[] array)
         {
-            if (array.Length > 1) { var e = array[array.Length]; }
+            if (array.Length > 1) { var e = array[array.Length]; } // UdonSharp lacks throw — intentional IndexOutOfRangeException
             var result = array[0];
             return result;
         }
@@ -582,7 +586,7 @@ namespace ULinq
                 result = t;
                 count++;
             }
-            if (count != 1) result = array[array.Length];
+            if (count != 1) result = array[array.Length]; // UdonSharp lacks throw — intentional IndexOutOfRangeException
             return result;
         }
 
@@ -591,7 +595,7 @@ namespace ULinq
         [Inline]
         public static T SingleOrDefault<T>(this T[] array)
         {
-            if (array.Length > 1) { var e = array[array.Length]; }
+            if (array.Length > 1) { var e = array[array.Length]; } // UdonSharp lacks throw — intentional IndexOutOfRangeException
             var result = default(T);
             if (array.Length > 0) result = array[0];
             return result;
@@ -610,7 +614,7 @@ namespace ULinq
                 result = t;
                 count++;
             }
-            if (count > 1) result = array[array.Length];
+            if (count > 1) result = array[array.Length]; // UdonSharp lacks throw — intentional IndexOutOfRangeException
             return result;
         }
 
@@ -671,17 +675,15 @@ namespace ULinq
         [Inline]
         public static T[] TakeWhile<T>(this T[] array, Func<T, bool> predicate)
         {
-            var temp = new T[array.Length];
             var count = 0;
             foreach (var t in array)
             {
                 if (!predicate(t)) break;
-                temp[count] = t;
                 count++;
             }
             var result = new T[count];
             for (var i = 0; i < count; i++)
-                result[i] = temp[i];
+                result[i] = array[i];
             return result;
         }
 
@@ -689,19 +691,16 @@ namespace ULinq
         [Inline]
         public static T[] SkipWhile<T>(this T[] array, Func<T, bool> predicate)
         {
-            var temp = new T[array.Length];
-            var count = 0;
-            var skipping = true;
+            var skipCount = 0;
             foreach (var t in array)
             {
-                if (skipping && predicate(t)) continue;
-                skipping = false;
-                temp[count] = t;
-                count++;
+                if (!predicate(t)) break;
+                skipCount++;
             }
-            var result = new T[count];
-            for (var i = 0; i < count; i++)
-                result[i] = temp[i];
+            var len = array.Length - skipCount;
+            var result = new T[len];
+            for (var i = 0; i < len; i++)
+                result[i] = array[skipCount + i];
             return result;
         }
 
@@ -718,20 +717,24 @@ namespace ULinq
         }
 
         /// <summary>Filters elements by a predicate that receives the element index.</summary>
+        /// <remarks>Predicate is evaluated twice (count pass + fill pass). Avoid predicates with side effects.</remarks>
         [Inline]
         public static T[] Where<T>(this T[] array, Func<T, int, bool> predicate)
         {
-            var temp = new T[array.Length];
             var count = 0;
             for (var i = 0; i < array.Length; i++)
             {
                 if (!predicate(array[i], i)) continue;
-                temp[count] = array[i];
                 count++;
             }
             var result = new T[count];
-            for (var i = 0; i < count; i++)
-                result[i] = temp[i];
+            var idx = 0;
+            for (var i = 0; i < array.Length; i++)
+            {
+                if (!predicate(array[i], i)) continue;
+                result[idx] = array[i];
+                idx++;
+            }
             return result;
         }
 
@@ -1081,8 +1084,8 @@ namespace ULinq
         [Inline]
         public static void ForEach(this DataList list, Action<DataToken> action)
         {
-            for (var __i = 0; __i < list.Count; __i++)
-                action(list[__i]);
+            for (var i = 0; i < list.Count; i++)
+                action(list[i]);
         }
 
         /// <summary>Filters elements by a predicate.</summary>
@@ -1090,9 +1093,9 @@ namespace ULinq
         public static DataList Where(this DataList list, Func<DataToken, bool> predicate)
         {
             var result = new DataList();
-            for (var __i = 0; __i < list.Count; __i++)
+            for (var i = 0; i < list.Count; i++)
             {
-                var t = list[__i];
+                var t = list[i];
                 if (!predicate(t)) continue;
                 result.Add(t);
             }
@@ -1104,9 +1107,9 @@ namespace ULinq
         public static bool Any(this DataList list, Func<DataToken, bool> predicate)
         {
             var result = false;
-            for (var __i = 0; __i < list.Count; __i++)
+            for (var i = 0; i < list.Count; i++)
             {
-                var t = list[__i];
+                var t = list[i];
                 if (!predicate(t)) continue;
                 result = true;
                 break;
@@ -1119,9 +1122,9 @@ namespace ULinq
         public static bool All(this DataList list, Func<DataToken, bool> predicate)
         {
             var result = true;
-            for (var __i = 0; __i < list.Count; __i++)
+            for (var i = 0; i < list.Count; i++)
             {
-                var t = list[__i];
+                var t = list[i];
                 if (predicate(t)) continue;
                 result = false;
                 break;
@@ -1134,9 +1137,9 @@ namespace ULinq
         public static int Count(this DataList list, Func<DataToken, bool> predicate)
         {
             var count = 0;
-            for (var __i = 0; __i < list.Count; __i++)
+            for (var i = 0; i < list.Count; i++)
             {
-                var t = list[__i];
+                var t = list[i];
                 if (!predicate(t)) continue;
                 count++;
             }
@@ -1148,9 +1151,9 @@ namespace ULinq
         public static DataToken FirstOrDefault(this DataList list, Func<DataToken, bool> predicate)
         {
             var result = default(DataToken);
-            for (var __i = 0; __i < list.Count; __i++)
+            for (var i = 0; i < list.Count; i++)
             {
-                var t = list[__i];
+                var t = list[i];
                 if (!predicate(t)) continue;
                 result = t;
                 break;
@@ -1165,8 +1168,8 @@ namespace ULinq
         public static DataList Select(this DataList list, Func<DataToken, DataToken> func)
         {
             var result = new DataList();
-            for (var __i = 0; __i < list.Count; __i++)
-                result.Add(func(list[__i]));
+            for (var i = 0; i < list.Count; i++)
+                result.Add(func(list[i]));
             return result;
         }
 
@@ -1177,15 +1180,15 @@ namespace ULinq
         {
             var result = default(DataToken);
             var found = false;
-            for (var __i = 0; __i < list.Count; __i++)
+            for (var i = 0; i < list.Count; i++)
             {
-                var t = list[__i];
+                var t = list[i];
                 if (!predicate(t)) continue;
                 result = t;
                 found = true;
                 break;
             }
-            if (!found) result = list[list.Count];
+            if (!found) result = list[list.Count]; // UdonSharp lacks throw — intentional IndexOutOfRangeException
             return result;
         }
 
@@ -1203,7 +1206,7 @@ namespace ULinq
                 found = true;
                 break;
             }
-            if (!found) result = list[list.Count];
+            if (!found) result = list[list.Count]; // UdonSharp lacks throw — intentional IndexOutOfRangeException
             return result;
         }
 
@@ -1228,14 +1231,14 @@ namespace ULinq
         {
             var result = default(DataToken);
             var count = 0;
-            for (var __i = 0; __i < list.Count; __i++)
+            for (var i = 0; i < list.Count; i++)
             {
-                var t = list[__i];
+                var t = list[i];
                 if (!predicate(t)) continue;
                 result = t;
                 count++;
             }
-            if (count != 1) result = list[list.Count];
+            if (count != 1) result = list[list.Count]; // UdonSharp lacks throw — intentional IndexOutOfRangeException
             return result;
         }
 
@@ -1246,14 +1249,14 @@ namespace ULinq
         {
             var result = default(DataToken);
             var count = 0;
-            for (var __i = 0; __i < list.Count; __i++)
+            for (var i = 0; i < list.Count; i++)
             {
-                var t = list[__i];
+                var t = list[i];
                 if (!predicate(t)) continue;
                 result = t;
                 count++;
             }
-            if (count > 1) result = list[list.Count];
+            if (count > 1) result = list[list.Count]; // UdonSharp lacks throw — intentional IndexOutOfRangeException
             return result;
         }
 
@@ -1262,8 +1265,8 @@ namespace ULinq
         public static DataToken Aggregate(this DataList list, DataToken seed, Func<DataToken, DataToken, DataToken> func)
         {
             var result = seed;
-            for (var __i = 0; __i < list.Count; __i++)
-                result = func(result, list[__i]);
+            for (var i = 0; i < list.Count; i++)
+                result = func(result, list[i]);
             return result;
         }
 
@@ -1272,9 +1275,9 @@ namespace ULinq
         public static DataList TakeWhile(this DataList list, Func<DataToken, bool> predicate)
         {
             var result = new DataList();
-            for (var __i = 0; __i < list.Count; __i++)
+            for (var i = 0; i < list.Count; i++)
             {
-                var t = list[__i];
+                var t = list[i];
                 if (!predicate(t)) break;
                 result.Add(t);
             }
@@ -1287,9 +1290,9 @@ namespace ULinq
         {
             var result = new DataList();
             var skipping = true;
-            for (var __i = 0; __i < list.Count; __i++)
+            for (var i = 0; i < list.Count; i++)
             {
-                var t = list[__i];
+                var t = list[i];
                 if (skipping && predicate(t)) continue;
                 skipping = false;
                 result.Add(t);
@@ -1348,7 +1351,7 @@ namespace ULinq
         [Inline]
         public static DataToken Single(this DataList list)
         {
-            if (list.Count > 1) { var e = list[list.Count]; }
+            if (list.Count > 1) { var e = list[list.Count]; } // UdonSharp lacks throw — intentional IndexOutOfRangeException
             var result = list[0];
             return result;
         }
@@ -1358,7 +1361,7 @@ namespace ULinq
         [Inline]
         public static DataToken SingleOrDefault(this DataList list)
         {
-            if (list.Count > 1) { var e = list[list.Count]; }
+            if (list.Count > 1) { var e = list[list.Count]; } // UdonSharp lacks throw — intentional IndexOutOfRangeException
             var result = default(DataToken);
             if (list.Count > 0) result = list[0];
             return result;
@@ -1389,10 +1392,10 @@ namespace ULinq
         public static DataList Concat(this DataList list, DataList other)
         {
             var result = new DataList();
-            for (var __i = 0; __i < list.Count; __i++)
-                result.Add(list[__i]);
-            for (var __i = 0; __i < other.Count; __i++)
-                result.Add(other[__i]);
+            for (var i = 0; i < list.Count; i++)
+                result.Add(list[i]);
+            for (var i = 0; i < other.Count; i++)
+                result.Add(other[i]);
             return result;
         }
 
@@ -1401,8 +1404,8 @@ namespace ULinq
         public static DataList Append(this DataList list, DataToken value)
         {
             var result = new DataList();
-            for (var __i = 0; __i < list.Count; __i++)
-                result.Add(list[__i]);
+            for (var i = 0; i < list.Count; i++)
+                result.Add(list[i]);
             result.Add(value);
             return result;
         }
@@ -1413,8 +1416,8 @@ namespace ULinq
         {
             var result = new DataList();
             result.Add(value);
-            for (var __i = 0; __i < list.Count; __i++)
-                result.Add(list[__i]);
+            for (var i = 0; i < list.Count; i++)
+                result.Add(list[i]);
             return result;
         }
 
@@ -1423,13 +1426,13 @@ namespace ULinq
         public static DataList Distinct(this DataList list)
         {
             var result = new DataList();
-            for (var __i = 0; __i < list.Count; __i++)
+            for (var i = 0; i < list.Count; i++)
             {
-                var t1 = list[__i];
+                var t1 = list[i];
                 var found = false;
-                for (var __j = 0; __j < result.Count; __j++)
+                for (var j = 0; j < result.Count; j++)
                 {
-                    if (!t1.Equals(result[__j])) continue;
+                    if (!t1.Equals(result[j])) continue;
                     found = true;
                     break;
                 }

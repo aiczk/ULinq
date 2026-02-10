@@ -1,4 +1,4 @@
-namespace UdonLambda
+namespace ULinq
 {
     /// <summary>
     /// Marks a static extension method for compile-time inline expansion by the ULinq Source Generator.

@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace UdonLambda.SourceGenerator;
+namespace ULinq.SourceGenerator;
 
 /// <summary>
 /// Rewrites the inlined method body:
@@ -14,7 +14,7 @@ namespace UdonLambda.SourceGenerator;
 internal sealed class LambdaInliner : CSharpSyntaxRewriter
 {
     readonly string _receiverParamName;
-    readonly string _receiverExpr;
+    readonly ExpressionSyntax _receiverExpr;
     readonly Dictionary<string, ExpressionSyntax> _delegateArgs;
     readonly Counter _counter;
     readonly Dictionary<string, DelegateTypeInfo> _delegateTypeInfos;
@@ -26,7 +26,7 @@ internal sealed class LambdaInliner : CSharpSyntaxRewriter
 
     public LambdaInliner(
         string receiverParamName,
-        string receiverExpr,
+        ExpressionSyntax receiverExpr,
         Dictionary<string, ExpressionSyntax> delegateArgs,
         Counter counter,
         Dictionary<string, DelegateTypeInfo> delegateTypeInfos,
@@ -61,7 +61,7 @@ internal sealed class LambdaInliner : CSharpSyntaxRewriter
             if (node.Parent is MemberAccessExpressionSyntax ma && ma.Name == node)
                 return base.VisitIdentifierName(node);
 
-            return SyntaxFactory.ParseExpression(_receiverExpr).WithTriviaFrom(node);
+            return _receiverExpr.WithTriviaFrom(node);
         }
         return base.VisitIdentifierName(node);
     }
@@ -219,7 +219,7 @@ internal sealed class LambdaInliner : CSharpSyntaxRewriter
             return ExtractToMethod(typeInfo.Value, captures, paramNames, argExprs, block);
 
         // Last resort (type info unavailable)
-        _diagnostics.Add(Diagnostic.Create(UdonLambda.SourceGenerator.Diagnostics.UL0001, _invocationLocation));
+        _diagnostics.Add(Diagnostic.Create(ULinq.SourceGenerator.Diagnostics.UL0001, _invocationLocation));
         _hoistedStatements.AddRange(tempDecls);
         _hoistedStatements.AddRange(renamedBlock.Statements);
         return SyntaxFactory.LiteralExpression(SyntaxKind.DefaultLiteralExpression);
@@ -248,7 +248,7 @@ internal sealed class LambdaInliner : CSharpSyntaxRewriter
             .WithParameterList(SyntaxFactory.ParameterList(SyntaxFactory.SeparatedList(parameters)))
             .WithBody(originalBlock);
         _generatedMethods.Add(method);
-        _diagnostics.Add(Diagnostic.Create(UdonLambda.SourceGenerator.Diagnostics.UL0002, _invocationLocation, methodName));
+        _diagnostics.Add(Diagnostic.Create(ULinq.SourceGenerator.Diagnostics.UL0002, _invocationLocation, methodName));
 
         // Build call: __Lambda_N(arg0, ..., capture0, ...)
         var callArgs = new List<ArgumentSyntax>();

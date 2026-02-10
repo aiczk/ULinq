@@ -3,19 +3,29 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace UdonLambda.SourceGenerator;
+namespace ULinq.SourceGenerator;
 
 internal static class Diagnostics
 {
     public static readonly DiagnosticDescriptor UL0001 = new(
         "UL0001", "Unresolved block lambda",
         "Block lambda could not be resolved; output may be incorrect",
-        "UdonLambda", DiagnosticSeverity.Warning, true);
+        "ULinq", DiagnosticSeverity.Warning, true);
 
     public static readonly DiagnosticDescriptor UL0002 = new(
         "UL0002", "Lambda extracted to method",
         "Block lambda extracted to private method '{0}'",
-        "UdonLambda", DiagnosticSeverity.Info, true);
+        "ULinq", DiagnosticSeverity.Info, true);
+
+    public static readonly DiagnosticDescriptor UL0003 = new(
+        "UL0003", "Disk write failed",
+        "Failed to write expanded source to Temp/: {0}",
+        "ULinq", DiagnosticSeverity.Warning, true);
+
+    public static readonly DiagnosticDescriptor UL0004 = new(
+        "UL0004", "Source generation failed",
+        "Failed to process class '{0}': {1}",
+        "ULinq", DiagnosticSeverity.Warning, true);
 }
 
 internal readonly struct InlineMethodInfo
