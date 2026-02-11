@@ -14,6 +14,7 @@
 - `Harmony.Patch()` now wrapped in try-catch with diagnostic log
 - `ReadFilePostfix` IOException catch now sets `__result = ""` (prevents NullReferenceException)
 - `ContainsReturn()` memoized with `Dictionary<SyntaxNode, bool>` cache (eliminates O(n²) tree traversal)
+- Thread safety: `RebuildExpandedFileMap` now builds into local variables before publishing — fixes `IndexOutOfRangeException` when UdonSharp's `Parallel.ForEach` invokes `ReadFilePostfix` concurrently
 
 ## [1.0.3] - 2026-02-11
 

@@ -34,6 +34,7 @@ namespace ULinq.Editor
         private static Dictionary<string, string> _expandedFileMap;
         // original filename -> expanded file path (fallback for path mismatches)
         private static Dictionary<string, string> _expandedFileNameMap;
+        private static readonly object _mapLock = new();
         private static bool _patched;
 
         // Fixed GUIDs for runtime files copied to Assets/ (VPM install).
@@ -212,7 +213,13 @@ namespace ULinq.Editor
         private static void ReadFilePostfix(string filePath, ref string __result)
         {
             if (_expandedFileMap == null)
-                RebuildExpandedFileMap();
+            {
+                lock (_mapLock)
+                {
+                    if (_expandedFileMap == null)
+                        RebuildExpandedFileMap();
+                }
+            }
 
             if (TryResolveExpandedPath(filePath, out var expandedPath))
             {
@@ -231,15 +238,23 @@ namespace ULinq.Editor
         /// </summary>
         private static bool TryResolveExpandedPath(string filePath, out string expandedPath)
         {
+            var fileMap = _expandedFileMap;
+            var fileNameMap = _expandedFileNameMap;
+            if (fileMap == null || fileNameMap == null)
+            {
+                expandedPath = null;
+                return false;
+            }
+
             var normalizedPath = NormalizePath(filePath);
-            if (_expandedFileMap!.TryGetValue(normalizedPath, out expandedPath))
+            if (fileMap.TryGetValue(normalizedPath, out expandedPath))
                 return true;
 
             var idx = normalizedPath.IndexOf("Assets/", StringComparison.OrdinalIgnoreCase);
-            if (idx > 0 && _expandedFileMap.TryGetValue(normalizedPath[idx..], out expandedPath))
+            if (idx > 0 && fileMap.TryGetValue(normalizedPath[idx..], out expandedPath))
                 return true;
 
-            if (_expandedFileNameMap!.TryGetValue(Path.GetFileName(filePath), out expandedPath))
+            if (fileNameMap.TryGetValue(Path.GetFileName(filePath), out expandedPath))
                 return true;
 
             expandedPath = null;
@@ -248,11 +263,13 @@ namespace ULinq.Editor
 
         private static void RebuildExpandedFileMap()
         {
-            _expandedFileMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            _expandedFileNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var fileMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var fileNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (!Directory.Exists(TempDir))
             {
                 Debug.LogWarning($"[ULinq] {TempDir} not found. Source Generator may not be running. Check that ULinq.SourceGenerator.dll is in Assets/ with labels: [RoslynAnalyzer] in its .meta file.");
+                _expandedFileMap = fileMap;
+                _expandedFileNameMap = fileNameMap;
                 return;
             }
 
@@ -269,13 +286,16 @@ namespace ULinq.Editor
                     if (string.IsNullOrEmpty(sourcePath))
                         continue;
 
-                    _expandedFileMap[sourcePath] = file;
+                    fileMap[sourcePath] = file;
                     // Filename fallback (first entry wins — @source provides collision safety)
                     var fileName = Path.GetFileName(sourcePath);
-                    _expandedFileNameMap.TryAdd(fileName, file);
+                    fileNameMap.TryAdd(fileName, file);
                 }
                 catch (IOException e) { Debug.LogWarning($"[ULinq] Failed to parse expanded file: {file}\n{e.Message}"); }
             }
+
+            _expandedFileMap = fileMap;
+            _expandedFileNameMap = fileNameMap;
         }
 
         private static bool FilesEqual(string a, string b)
