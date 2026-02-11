@@ -636,4 +636,64 @@ public class Foo : UdonSharpBehaviour {
         Assert.Contains("break", source);
         Assert.DoesNotContain(".Any(", source);
     }
+
+    // === Unbraced loop body with inline calls (2) ===
+
+    [Fact]
+    public void UnbracedForBody_InlineCall_CompilesCleanly()
+    {
+        // Regression: unbraced for body with inline expansion left orphaned _pendingStatements
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp; using System;
+public class Foo : UdonSharpBehaviour {
+    public int[] nums;
+    void Start() {
+        var c = 0;
+        for (var i = 0; i < nums.Length; i++)
+            if (nums.Any(x => x > 10)) c++;
+    }
+}");
+        Assert.DoesNotContain(".Any(", source);
+    }
+
+    [Fact]
+    public void UnbracedForBody_CompoundAndWithInline_CompilesCleanly()
+    {
+        // Regression: user-level && with inline call in unbraced for body caused __sc_N scoping errors
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp; using System;
+public class Foo : UdonSharpBehaviour {
+    public int[] nums;
+    void Start() {
+        var c = 0;
+        for (var i = 0; i < nums.Length; i++)
+            if (i > 0 && nums.Any(x => x == i)) c++;
+    }
+}");
+        Assert.DoesNotContain(".Any(", source);
+        Assert.Contains("__sc_", source);
+    }
+
+    [Fact]
+    public void BracedIfBody_CompoundAndWithInline_DeclBeforeUse()
+    {
+        // Regression: if (a && inline()) { body; } — __sc_N pending drained into then-block by VisitBlock
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp; using System;
+public class Foo : UdonSharpBehaviour {
+    public int[] nums;
+    void Start() {
+        var c = 0;
+        for (var j = 0; j < nums.Length; j++)
+            if (nums[j] > 0 && nums.Any(x => x == nums[j]))
+            { c++; break; }
+    }
+}");
+        Assert.DoesNotContain(".Any(", source);
+        Assert.Contains("__sc_", source);
+        // __sc_N declaration must appear before its use in the if condition
+        var declPos = source.IndexOf("var __sc_");
+        var usePos = source.IndexOf("if (__sc_");
+        Assert.True(declPos < usePos, $"__sc_N declared at {declPos} but used at {usePos}");
+    }
 }

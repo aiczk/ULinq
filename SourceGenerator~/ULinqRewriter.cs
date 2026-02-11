@@ -136,7 +136,7 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
         return base.VisitInvocationExpression(node);
     }
 
-    bool HasInlineCall(ExpressionSyntax expr)
+    bool HasInlineCall(SyntaxNode expr)
     {
         if (expr == null) return false;
         foreach (var inv in expr.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>())
@@ -181,18 +181,44 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
         return (result, hoisted);
     }
 
+    public override SyntaxNode VisitIfStatement(IfStatementSyntax node)
+    {
+        if (!HasInlineCall(node.Condition))
+            return base.VisitIfStatement(node);
+
+        // Visit condition — may generate __sc_N pending
+        var visitedCondition = (ExpressionSyntax)Visit(node.Condition);
+        var conditionPending = DrainPending();
+
+        // Visit then/else with clean pending so VisitBlock doesn't drain condition pending
+        var visitedStatement = (StatementSyntax)Visit(node.Statement);
+        var visitedElse = node.Else != null ? (ElseClauseSyntax)Visit(node.Else) : null;
+
+        // Push condition pending back for outer scope to drain
+        _pendingStatements.InsertRange(0, conditionPending);
+
+        return node.WithCondition(visitedCondition)
+            .WithStatement(visitedStatement)
+            .WithElse(visitedElse);
+    }
+
     public override SyntaxNode VisitWhileStatement(WhileStatementSyntax node)
     {
         if (!HasInlineCall(node.Condition))
-            return base.VisitWhileStatement(node);
+        {
+            var result = (WhileStatementSyntax)base.VisitWhileStatement(node);
+            return DrainPendingIntoLoopBody(result, result.Statement, s => result.WithStatement(s));
+        }
 
         var visitedCondition = (ExpressionSyntax)Visit(node.Condition);
         var pending = new List<StatementSyntax>(_pendingStatements);
         _pendingStatements.Clear();
         var visitedBody = (StatementSyntax)Visit(node.Statement);
+        var bodyPending = DrainPending();
 
         var stmts = new List<StatementSyntax>(pending);
         stmts.Add(IfNotBreak(visitedCondition));
+        stmts.AddRange(bodyPending);
         FlattenInto(stmts, visitedBody);
 
         return SyntaxFactory.WhileStatement(
@@ -203,18 +229,45 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
     public override SyntaxNode VisitForStatement(ForStatementSyntax node)
     {
         if (!HasInlineCall(node.Condition))
-            return base.VisitForStatement(node);
+        {
+            var result = (ForStatementSyntax)base.VisitForStatement(node);
+            return DrainPendingIntoLoopBody(result, result.Statement, s => result.WithStatement(s));
+        }
 
         var visitedCondition = (ExpressionSyntax)Visit(node.Condition);
         var pending = new List<StatementSyntax>(_pendingStatements);
         _pendingStatements.Clear();
         var visitedBody = (StatementSyntax)Visit(node.Statement);
+        var bodyPending = DrainPending();
 
         var stmts = new List<StatementSyntax>(pending);
         stmts.Add(IfNotBreak(visitedCondition));
+        stmts.AddRange(bodyPending);
         FlattenInto(stmts, visitedBody);
 
         return node.WithCondition(null).WithStatement(SyntaxFactory.Block(stmts));
+    }
+
+    public override SyntaxNode VisitForEachStatement(ForEachStatementSyntax node)
+    {
+        var result = (ForEachStatementSyntax)base.VisitForEachStatement(node);
+        return DrainPendingIntoLoopBody(result, result.Statement, s => result.WithStatement(s));
+    }
+
+    List<StatementSyntax> DrainPending()
+    {
+        var list = new List<StatementSyntax>(_pendingStatements);
+        _pendingStatements.Clear();
+        return list;
+    }
+
+    T DrainPendingIntoLoopBody<T>(T loopNode, StatementSyntax body,
+        System.Func<StatementSyntax, T> withBody) where T : SyntaxNode
+    {
+        if (_pendingStatements.Count == 0) return loopNode;
+        var stmts = DrainPending();
+        FlattenInto(stmts, body);
+        return withBody(SyntaxFactory.Block(stmts));
     }
 
     public override SyntaxNode VisitBinaryExpression(BinaryExpressionSyntax node)
