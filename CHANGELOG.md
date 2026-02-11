@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.5] - 2026-02-11
+
+### Added
+- Short-circuit preservation: `a.Any(...) && b.All(...)` now correctly skips the right operand when the left determines the result. Applies to `&&`, `||`, and ternary `?:` in statement contexts
+- `ConvertEarlyReturns` switch support: `[Inline]` methods can now use `switch` with `return` in case branches
+
+### Fixed
+- `HasEarlyReturn` failed to detect `return` statements inside a `switch` when it was the only/last statement in the method body
+
 ## [1.0.4] - 2026-02-11
 
 ### Changed
@@ -85,7 +94,7 @@
 
 ### Known Limitations
 - `[Inline]` methods and calling code must be in Assembly-CSharp (no asmdef separation)
-- Short-circuit operators (`&&`, `||`, ternary) in expanded code evaluate both sides
+- Short-circuit operators (`&&`, `||`, ternary) in expanded code evaluate both sides (fixed in v1.0.5 for statement contexts)
 - Chained operations allocate intermediate arrays between steps
 - `Take`/`Skip` throw on out-of-range counts (unlike LINQ which clamps)
 - `Aggregate` (no seed) throws `IndexOutOfRangeException` on empty arrays

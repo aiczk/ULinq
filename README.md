@@ -46,7 +46,8 @@ Udon VM — VRChat's runtime — has hard constraints that rule out conventional
 - **Block lambdas** — multi-statement bodies with hoisting: `x => { var y = x * 2; return y + 1; }`
 - **Nested lambdas** — inner lambda calls within outer lambda bodies
 - **Expression contexts** — works in `return`, `if` conditions, method arguments, `while`/`for` conditions, expression-bodied members
-- **Extensible** — define your own `[Inline]` methods; the SG expands them the same way
+- **Short-circuit preservation** — `a.Any(...) && b.All(...)` correctly skips `b` when `a` is false; same for `||` and ternary `?:`
+- **Extensible** — define your own `[Inline]` methods with `if`/`switch` early returns; the SG expands them the same way
 
 ## Installation
 
@@ -268,7 +269,6 @@ The SG inlines the method body at each call site, replacing `predicate(t)` with 
 ## Limitations
 
 - **Same-assembly requirement** — `[Inline]` methods and calling code must be in Assembly-CSharp (no asmdef separation)
-- **Short-circuit operators** — `&&`, `||`, ternary in expanded code evaluate both sides (safe for side-effect-free lambdas)
 - **Chained operations** — each chained call allocates an intermediate array (e.g. `Where(...).Select(...)` creates a temp array between steps)
 
 ## Troubleshooting

@@ -48,6 +48,7 @@ namespace ULinq
         [Inline] public static T[] Where<T>(this T[] array, Func<T, bool> predicate) { var temp = new T[array.Length]; var count = 0; foreach (var t in array) { if (!predicate(t)) continue; temp[count] = t; count++; } var result = new T[count]; for (var idx = 0; idx < count; idx++) result[idx] = temp[idx]; return result; }
         [Inline] public static bool Any<T>(this T[] array, Func<T, bool> predicate) { var result = false; foreach (var t in array) { if (!predicate(t)) continue; result = true; break; } return result; }
         [Inline] public static int Count<T>(this T[] array, Func<T, bool> predicate) { var count = 0; foreach (var t in array) { if (!predicate(t)) continue; count++; } return count; }
+        [Inline] public static bool All<T>(this T[] array, Func<T, bool> predicate) { var result = true; foreach (var t in array) { if (predicate(t)) continue; result = false; break; } return result; }
     }
 }
 ";
@@ -431,5 +432,136 @@ public class Foo : UdonSharpBehaviour {
 }");
         Assert.Contains("__Lambda_", source);
         Assert.Contains("int threshold", source);
+    }
+
+    // === Switch early return (3) ===
+
+    [Fact]
+    public void Switch_AllCasesReturn_ConvertsToResultVariable()
+    {
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp;
+public static class SwitchHelper {
+    [Inline] public static string Describe(this int x)
+    { switch (x) { case 0: return ""zero""; case 1: return ""one""; default: return ""other""; } }
+}
+public class Foo : UdonSharpBehaviour {
+    void Start() { var r = 5.Describe(); }
+}");
+        Assert.Contains("__result_", source);
+        Assert.DoesNotContain("return \"zero\"", source);
+        Assert.DoesNotContain("return \"one\"", source);
+        Assert.Contains("switch", source);
+    }
+
+    [Fact]
+    public void Switch_CaseWithSideEffect_PreservesSideEffect()
+    {
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp; using UnityEngine;
+public static class SwitchHelper2 {
+    [Inline] public static int Process(this int x)
+    { switch (x) { case 0: Debug.Log(""zero""); return 0; default: return x * 2; } }
+}
+public class Foo : UdonSharpBehaviour {
+    void Start() { var r = 3.Process(); }
+}");
+        Assert.Contains("__result_", source);
+        Assert.Contains("Debug.Log", source);
+        Assert.Contains("switch", source);
+    }
+
+    [Fact]
+    public void Switch_PartialReturnWithRemaining_ProcessesRemaining()
+    {
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp;
+public static class SwitchHelper3 {
+    [Inline] public static int Adjust(this int x)
+    { switch (x) { case 0: return -1; default: break; } return x + 10; }
+}
+public class Foo : UdonSharpBehaviour {
+    void Start() { var r = 3.Adjust(); }
+}");
+        Assert.Contains("__result_", source);
+        Assert.Contains("+ 10", source);
+        Assert.Contains("switch", source);
+    }
+
+    // === Short-circuit evaluation (5) ===
+
+    [Fact]
+    public void ShortCircuit_AndWithInlineCalls_GeneratesScVariable()
+    {
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp; using UnityEngine;
+public class Foo : UdonSharpBehaviour {
+    public int[] a;
+    public int[] b;
+    void Start() { if (a.Any(x => x > 0) && b.All(x => x > 0)) Debug.Log(""yes""); }
+}");
+        Assert.Contains("__sc_", source);
+        Assert.DoesNotContain(".Any(", source);
+        Assert.DoesNotContain(".All(", source);
+    }
+
+    [Fact]
+    public void ShortCircuit_OrWithInlineCalls_GeneratesScVariable()
+    {
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp; using UnityEngine;
+public class Foo : UdonSharpBehaviour {
+    public int[] a;
+    public int[] b;
+    void Start() { if (a.Any(x => x > 0) || b.Any(x => x < 0)) Debug.Log(""yes""); }
+}");
+        Assert.Contains("__sc_", source);
+        Assert.DoesNotContain(".Any(", source);
+    }
+
+    [Fact]
+    public void ShortCircuit_ChainedAnd_RecursivelyHandled()
+    {
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp; using UnityEngine;
+public class Foo : UdonSharpBehaviour {
+    public int[] a;
+    public int[] b;
+    public int[] c;
+    void Start() { if (a.Any(x => x > 0) && b.Any(x => x > 1) && c.Any(x => x > 2)) Debug.Log(""yes""); }
+}");
+        var scCount = System.Text.RegularExpressions.Regex.Matches(source, @"__sc_\d+")
+            .Cast<System.Text.RegularExpressions.Match>().Select(m => m.Value).Distinct().Count();
+        Assert.True(scCount >= 2, $"Expected >= 2 distinct __sc_ vars, got {scCount}");
+    }
+
+    [Fact]
+    public void ShortCircuit_Ternary_GeneratesIfElse()
+    {
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp;
+public class Foo : UdonSharpBehaviour {
+    public int[] a;
+    public int[] b;
+    public bool flag;
+    void Start() { var r = flag ? a.Count(x => x > 0) : b.Count(x => x < 0); }
+}");
+        Assert.Contains("__sc_", source);
+        Assert.Contains("else", source);
+        Assert.DoesNotContain(".Count(", source);
+    }
+
+    [Fact]
+    public void ShortCircuit_LeftOnlyInlineCall_NoScVariable()
+    {
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp; using UnityEngine;
+public class Foo : UdonSharpBehaviour {
+    public int[] nums;
+    public bool flag;
+    void Start() { if (nums.Any(x => x > 0) && flag) Debug.Log(""yes""); }
+}");
+        Assert.DoesNotContain("__sc_", source);
+        Assert.DoesNotContain(".Any(", source);
     }
 }

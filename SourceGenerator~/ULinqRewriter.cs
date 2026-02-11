@@ -217,6 +217,88 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
         return node.WithCondition(null).WithStatement(SyntaxFactory.Block(stmts));
     }
 
+    public override SyntaxNode VisitBinaryExpression(BinaryExpressionSyntax node)
+    {
+        if ((node.IsKind(SyntaxKind.LogicalAndExpression) || node.IsKind(SyntaxKind.LogicalOrExpression))
+            && HasInlineCall(node.Right))
+        {
+            bool isAnd = node.IsKind(SyntaxKind.LogicalAndExpression);
+
+            var savedPending = new List<StatementSyntax>(_pendingStatements);
+            _pendingStatements.Clear();
+
+            var visitedLeft = (ExpressionSyntax)Visit(node.Left);
+            var leftPending = new List<StatementSyntax>(_pendingStatements);
+            _pendingStatements.Clear();
+
+            var visitedRight = (ExpressionSyntax)Visit(node.Right);
+            var rightPending = new List<StatementSyntax>(_pendingStatements);
+            _pendingStatements.Clear();
+
+            var scName = $"__sc_{_counter.Next()}";
+            var ifBody = new List<StatementSyntax>(rightPending);
+            ifBody.Add(SyntaxFactory.ParseStatement(
+                $"{scName} = {visitedRight.NormalizeWhitespace().ToFullString()};"));
+
+            var condition = isAnd
+                ? visitedLeft
+                : (ExpressionSyntax)SyntaxFactory.PrefixUnaryExpression(
+                    SyntaxKind.LogicalNotExpression,
+                    SyntaxFactory.ParenthesizedExpression(visitedLeft));
+
+            _pendingStatements.AddRange(savedPending);
+            _pendingStatements.AddRange(leftPending);
+            _pendingStatements.Add(SyntaxFactory.ParseStatement(
+                $"var {scName} = {(isAnd ? "false" : "true")};"));
+            _pendingStatements.Add(SyntaxFactory.IfStatement(condition, SyntaxFactory.Block(ifBody)));
+
+            return SyntaxFactory.IdentifierName(scName);
+        }
+        return base.VisitBinaryExpression(node);
+    }
+
+    public override SyntaxNode VisitConditionalExpression(ConditionalExpressionSyntax node)
+    {
+        if (HasInlineCall(node.WhenTrue) || HasInlineCall(node.WhenFalse))
+        {
+            var savedPending = new List<StatementSyntax>(_pendingStatements);
+            _pendingStatements.Clear();
+
+            var visitedCond = (ExpressionSyntax)Visit(node.Condition);
+            var condPending = new List<StatementSyntax>(_pendingStatements);
+            _pendingStatements.Clear();
+
+            var visitedTrue = (ExpressionSyntax)Visit(node.WhenTrue);
+            var truePending = new List<StatementSyntax>(_pendingStatements);
+            _pendingStatements.Clear();
+
+            var visitedFalse = (ExpressionSyntax)Visit(node.WhenFalse);
+            var falsePending = new List<StatementSyntax>(_pendingStatements);
+            _pendingStatements.Clear();
+
+            var typeName = _model.GetTypeInfo(node).Type?.ToDisplayString() ?? "object";
+            var scName = $"__sc_{_counter.Next()}";
+
+            var trueBody = new List<StatementSyntax>(truePending);
+            trueBody.Add(SyntaxFactory.ParseStatement(
+                $"{scName} = {visitedTrue.NormalizeWhitespace().ToFullString()};"));
+
+            var falseBody = new List<StatementSyntax>(falsePending);
+            falseBody.Add(SyntaxFactory.ParseStatement(
+                $"{scName} = {visitedFalse.NormalizeWhitespace().ToFullString()};"));
+
+            _pendingStatements.AddRange(savedPending);
+            _pendingStatements.AddRange(condPending);
+            _pendingStatements.Add(SyntaxFactory.ParseStatement($"{typeName} {scName} = default;"));
+            _pendingStatements.Add(SyntaxFactory.IfStatement(
+                visitedCond, SyntaxFactory.Block(trueBody),
+                SyntaxFactory.ElseClause(SyntaxFactory.Block(falseBody))));
+
+            return SyntaxFactory.IdentifierName(scName);
+        }
+        return base.VisitConditionalExpression(node);
+    }
+
     static IfStatementSyntax IfNotBreak(ExpressionSyntax condition)
         => SyntaxFactory.IfStatement(
             SyntaxFactory.PrefixUnaryExpression(SyntaxKind.LogicalNotExpression,
@@ -435,6 +517,10 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
             if (statements[i] is ReturnStatementSyntax) return true;
             if (statements[i].DescendantNodes().OfType<ReturnStatementSyntax>().Any()) return true;
         }
+        // Switch as last/only statement with returns inside
+        if (statements.Count > 0 && statements[statements.Count - 1] is SwitchStatementSyntax sw
+            && sw.DescendantNodes().OfType<ReturnStatementSyntax>().Any())
+            return true;
         return false;
     }
 
@@ -485,6 +571,32 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
 
                 result.Add(ifStmt.WithStatement(thenBranch)
                     .WithElse(SyntaxFactory.ElseClause(elseBranch)));
+                break;
+            }
+
+            if (stmts[i] is SwitchStatementSyntax switchStmt
+                && switchStmt.DescendantNodes().OfType<ReturnStatementSyntax>().Any())
+            {
+                var remaining = new List<StatementSyntax>();
+                for (int j = i + 1; j < stmts.Count; j++) remaining.Add(stmts[j]);
+
+                var newSections = new List<SwitchSectionSyntax>();
+                foreach (var section in switchStmt.Sections)
+                {
+                    if (section.Statements.Any(s => s is ReturnStatementSyntax
+                        || s.DescendantNodes().OfType<ReturnStatementSyntax>().Any()))
+                    {
+                        var converted = ConvertEarlyReturns(section.Statements, rv);
+                        converted.Add(SyntaxFactory.BreakStatement());
+                        newSections.Add(section.WithStatements(SyntaxFactory.List(converted)));
+                    }
+                    else
+                        newSections.Add(section);
+                }
+
+                result.Add(switchStmt.WithSections(SyntaxFactory.List(newSections)));
+                if (remaining.Count > 0)
+                    result.AddRange(ConvertEarlyReturns(remaining, rv));
                 break;
             }
 

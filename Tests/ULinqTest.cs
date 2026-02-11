@@ -164,6 +164,16 @@ public class ULinqTest : UdonSharpBehaviour
         _fail += EvenCount.Eq("ExprP EvenCount", 5);
         _fail += HasLongName.Eq("ExprP HasLongName", true);
 
+        // === Short-circuit evaluation ===
+        _fail += (_nums.Any(x => x > 5) && _nums.All(x => x > 0)).Eq("&& TT", true);
+        _fail += (_nums.Any(x => x > 100) && _nums.All(x => x > 0)).Eq("&& FT", false);
+        _fail += (_nums.Any(x => x > 5) || _nums.Any(x => x > 100)).Eq("|| TF", true);
+        _fail += (_nums.Any(x => x > 100) || _nums.Any(x => x > 5)).Eq("|| FT", true);
+        _fail += (_nums.Any(x => x > 100) || _nums.Any(x => x > 200)).Eq("|| FF", false);
+        _fail += (_nums.Any(x => x > 5) && _nums.All(x => x > 0) && _nums.Any(x => x == 10)).Eq("&&& chain", true);
+        var scTern = true ? _nums.Count(x => x > 5) : _nums.Count(x => x < 5);
+        _fail += scTern.Eq("?: true branch", 5);
+
         // === DataList ===
         TestDataList();
 
