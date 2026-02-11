@@ -363,7 +363,12 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
         // ReducedFrom handles the case where an extension method call resolves to a reduced form
         var lookupKey = resolved.ReducedFrom?.OriginalDefinition ?? resolved.OriginalDefinition;
         if (!_inlineBySymbol.TryGetValue(lookupKey, out method)) return false;
-        receiver = memberAccess.Expression;
+        // Static call to extension method: Class.Method(arg) — first arg is 'this'
+        if (resolved.ReducedFrom == null && method.Symbol.IsExtensionMethod
+            && invocation.ArgumentList.Arguments.Count > 0)
+            receiver = invocation.ArgumentList.Arguments[0].Expression;
+        else
+            receiver = memberAccess.Expression;
         return true;
     }
 
@@ -419,6 +424,11 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
         }
 
         var callArgs = invocation.ArgumentList;
+        // For static extension calls, the 'this' arg is already extracted as receiver; strip it
+        if (_model.GetSymbolInfo(invocation).Symbol is IMethodSymbol rc
+            && rc.ReducedFrom == null && method.Symbol.IsExtensionMethod
+            && callArgs.Arguments.Count > 0)
+            callArgs = SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(callArgs.Arguments.Skip(1)));
         var methodParams = method.Symbol.Parameters;
 
         BlockSyntax methodBody = method.Syntax.Body;
@@ -449,7 +459,13 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
             invocation.GetLocation(), returnTypeName);
 
         prefixStatements.AddRange(expansion.Statements);
-        return new InlineExpansion(prefixStatements, expansion.ReturnExpression);
+        var retExpr = expansion.ReturnExpression;
+        if (retExpr != null && retExpr is not (IdentifierNameSyntax or LiteralExpressionSyntax
+            or ParenthesizedExpressionSyntax or InvocationExpressionSyntax
+            or ElementAccessExpressionSyntax or MemberAccessExpressionSyntax
+            or ThisExpressionSyntax or DefaultExpressionSyntax))
+            retExpr = SyntaxFactory.ParenthesizedExpression(retExpr);
+        return new InlineExpansion(prefixStatements, retExpr);
     }
 
     InlineExpansion ProcessMethodBody(

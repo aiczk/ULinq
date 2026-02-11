@@ -7,6 +7,8 @@
 - `ConvertEarlyReturns` switch support: `[Inline]` methods can now use `switch` with `return` in case branches
 
 ### Fixed
+- Static calls to `[Inline]` extension methods (`Class.Method(arg)`) now correctly use the first argument as receiver instead of the class name
+- Expanded expressions from `[Inline]` methods are now parenthesized when substituted into operator contexts (e.g. `!x.IsTerminal()` → `!(x < 27 && ...)` instead of `!x < 27 && ...`)
 - `HasEarlyReturn` failed to detect `return` statements inside a `switch` when it was the only/last statement in the method body
 - Stale generated files in `Library/ULinqGenerated/` were never cleaned up — if a class stopped using `[Inline]` methods, the old expanded code was still served to UdonSharp. Now cleaned on `compilationStarted`
 
