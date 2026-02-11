@@ -207,7 +207,8 @@ internal sealed class LambdaInliner : CSharpSyntaxRewriter
         var renamedBlock = _counter.RenameLocals(block, paramRenames);
 
         var hoistable = new List<StatementSyntax>();
-        if (TrySplitBlockReturns(renamedBlock.Statements, hoistable, out var returnExpr))
+        var returnCache = new Dictionary<SyntaxNode, bool>();
+        if (TrySplitBlockReturns(renamedBlock.Statements, hoistable, returnCache, out var returnExpr))
         {
             _hoistedStatements.AddRange(tempDecls);
             _hoistedStatements.AddRange(hoistable);
@@ -263,18 +264,25 @@ internal sealed class LambdaInliner : CSharpSyntaxRewriter
     }
 
     /// <summary>Returns true if the statement or any descendant contains a ReturnStatementSyntax.</summary>
-    static bool ContainsReturn(StatementSyntax stmt)
-        => stmt is ReturnStatementSyntax || stmt.DescendantNodes().OfType<ReturnStatementSyntax>().Any();
+    static bool ContainsReturn(StatementSyntax stmt, Dictionary<SyntaxNode, bool> cache)
+    {
+        if (cache.TryGetValue(stmt, out var cached)) return cached;
+        var result = stmt is ReturnStatementSyntax || stmt.DescendantNodes().OfType<ReturnStatementSyntax>().Any();
+        cache[stmt] = result;
+        return result;
+    }
 
     /// <summary>
     /// Splits a statement list into hoistable prefix statements and a conditional return expression.
     /// </summary>
     static bool TrySplitBlockReturns(
-        SyntaxList<StatementSyntax> statements, List<StatementSyntax> hoistable, out ExpressionSyntax returnExpr)
-        => TrySplitBlockReturns(statements.ToArray(), hoistable, out returnExpr);
+        SyntaxList<StatementSyntax> statements, List<StatementSyntax> hoistable,
+        Dictionary<SyntaxNode, bool> returnCache, out ExpressionSyntax returnExpr)
+        => TrySplitBlockReturns(statements.ToArray(), hoistable, returnCache, out returnExpr);
 
     static bool TrySplitBlockReturns(
-        IReadOnlyList<StatementSyntax> statements, List<StatementSyntax> hoistable, out ExpressionSyntax returnExpr)
+        IReadOnlyList<StatementSyntax> statements, List<StatementSyntax> hoistable,
+        Dictionary<SyntaxNode, bool> returnCache, out ExpressionSyntax returnExpr)
     {
         returnExpr = null;
         for (int i = 0; i < statements.Count; i++)
@@ -289,16 +297,16 @@ internal sealed class LambdaInliner : CSharpSyntaxRewriter
             }
 
             // If statement containing return → build conditional
-            if (stmt is IfStatementSyntax ifStmt && ContainsReturn(ifStmt))
+            if (stmt is IfStatementSyntax ifStmt && ContainsReturn(ifStmt, returnCache))
             {
                 var remaining = new List<StatementSyntax>();
                 for (int j = i + 1; j < statements.Count; j++)
                     remaining.Add(statements[j]);
-                return TryBuildConditional(ifStmt, remaining, hoistable, out returnExpr);
+                return TryBuildConditional(ifStmt, remaining, hoistable, returnCache, out returnExpr);
             }
 
             // Non-if statement containing return → cannot inline, bail out
-            if (ContainsReturn(stmt))
+            if (ContainsReturn(stmt, returnCache))
                 return false;
 
             // No return in this statement → hoist it
@@ -315,25 +323,26 @@ internal sealed class LambdaInliner : CSharpSyntaxRewriter
         IfStatementSyntax ifStmt,
         List<StatementSyntax> remaining,
         List<StatementSyntax> hoistable,
+        Dictionary<SyntaxNode, bool> returnCache,
         out ExpressionSyntax conditional)
     {
         conditional = null;
 
         // Extract then-branch expression
-        if (!TryExtractBranchExpr(ifStmt.Statement, hoistable, out var thenExpr))
+        if (!TryExtractBranchExpr(ifStmt.Statement, hoistable, returnCache, out var thenExpr))
             return false;
 
         ExpressionSyntax elseExpr;
         if (ifStmt.Else != null)
         {
             // else branch exists → extract from it
-            if (!TryExtractBranchExpr(ifStmt.Else.Statement, hoistable, out elseExpr))
+            if (!TryExtractBranchExpr(ifStmt.Else.Statement, hoistable, returnCache, out elseExpr))
                 return false;
         }
         else
         {
             // No else → remaining statements serve as else
-            if (!TrySplitBlockReturns(remaining, hoistable, out elseExpr))
+            if (!TrySplitBlockReturns(remaining, hoistable, returnCache, out elseExpr))
                 return false;
         }
 
@@ -345,7 +354,9 @@ internal sealed class LambdaInliner : CSharpSyntaxRewriter
     /// Extracts a return expression from a branch statement.
     /// Handles: return expr; | { stmts; return expr; } | if (...) ...
     /// </summary>
-    static bool TryExtractBranchExpr(StatementSyntax stmt, List<StatementSyntax> hoistable, out ExpressionSyntax expr)
+    static bool TryExtractBranchExpr(
+        StatementSyntax stmt, List<StatementSyntax> hoistable,
+        Dictionary<SyntaxNode, bool> returnCache, out ExpressionSyntax expr)
     {
         expr = null;
 
@@ -356,10 +367,10 @@ internal sealed class LambdaInliner : CSharpSyntaxRewriter
         }
 
         if (stmt is BlockSyntax block)
-            return TrySplitBlockReturns(block.Statements, hoistable, out expr);
+            return TrySplitBlockReturns(block.Statements, hoistable, returnCache, out expr);
 
         if (stmt is IfStatementSyntax nestedIf)
-            return TryBuildConditional(nestedIf, new List<StatementSyntax>(), hoistable, out expr);
+            return TryBuildConditional(nestedIf, new List<StatementSyntax>(), hoistable, returnCache, out expr);
 
         return false;
     }

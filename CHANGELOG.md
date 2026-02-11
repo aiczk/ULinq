@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.0.4] - 2026-02-11
+
+### Changed
+- `Where` / `Where` (indexed): single-pass temp array algorithm — predicate is now evaluated once per element (was twice in v1.0.3)
+- `SequenceEqual`, `FirstOrDefault()`, `LastOrDefault()`, `DefaultIfEmpty`: rewritten with early return guard clauses
+- SG: eliminated redundant `__chain_N` intermediate variables in method chaining
+- SG: reduced `__receiver_N` temp variables — simple receivers (identifiers, member access, literals, indexers) no longer wrapped
+
+### Fixed
+- SG output directory changed from `Temp/` to `Library/ULinqGenerated/` — fixes compilation errors on project reopen (Temp/ is cleared when Unity closes)
+- SG DLL `.meta`: added `labels: [RoslynAnalyzer]`, set `Editor: enabled: 0` — fixes `ReflectionTypeLoadException` from VRChat SDK scanning the SG assembly at runtime
+- `Harmony.Patch()` now wrapped in try-catch with diagnostic log
+- `ReadFilePostfix` IOException catch now sets `__result = ""` (prevents NullReferenceException)
+- `ContainsReturn()` memoized with `Dictionary<SyntaxNode, bool>` cache (eliminates O(n²) tree traversal)
+
 ## [1.0.3] - 2026-02-11
 
 ### Changed

@@ -137,9 +137,9 @@ public sealed class ULinqGenerator : IIncrementalGenerator
             var normalized = syntaxTreeFilePath.Replace('\\', '/');
             var idx = normalized.IndexOf("/Assets/", System.StringComparison.OrdinalIgnoreCase);
             if (idx > 0)
-                return Path.Combine(normalized.Substring(0, idx), "Temp", "ULinqGenerated");
+                return Path.Combine(normalized.Substring(0, idx), "Library", "ULinqGenerated");
         }
-        return Path.Combine("Temp", "ULinqGenerated");
+        return Path.Combine("Library", "ULinqGenerated");
     }
 
     static void WriteToDisk(string name, string code, string syntaxTreeFilePath)

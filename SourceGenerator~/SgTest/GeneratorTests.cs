@@ -45,7 +45,7 @@ namespace ULinq
     {
         [Inline] public static void ForEach<T>(this T[] array, Action<T> action) { foreach (var t in array) action(t); }
         [Inline] public static TResult[] Select<T, TResult>(this T[] array, Func<T, TResult> func) { var result = new TResult[array.Length]; for (var i = 0; i < array.Length; i++) result[i] = func(array[i]); return result; }
-        [Inline] public static T[] Where<T>(this T[] array, Func<T, bool> predicate) { var count = 0; foreach (var t in array) { if (!predicate(t)) continue; count++; } var result = new T[count]; var idx = 0; foreach (var t in array) { if (!predicate(t)) continue; result[idx] = t; idx++; } return result; }
+        [Inline] public static T[] Where<T>(this T[] array, Func<T, bool> predicate) { var temp = new T[array.Length]; var count = 0; foreach (var t in array) { if (!predicate(t)) continue; temp[count] = t; count++; } var result = new T[count]; for (var idx = 0; idx < count; idx++) result[idx] = temp[idx]; return result; }
         [Inline] public static bool Any<T>(this T[] array, Func<T, bool> predicate) { var result = false; foreach (var t in array) { if (!predicate(t)) continue; result = true; break; } return result; }
         [Inline] public static int Count<T>(this T[] array, Func<T, bool> predicate) { var count = 0; foreach (var t in array) { if (!predicate(t)) continue; count++; } return count; }
     }
@@ -176,7 +176,7 @@ public class Foo : UdonSharpBehaviour {
     public int[] nums;
     void Start() { var c = nums.Select(x => x * 2).Where(x => x > 0); }
 }");
-        Assert.Contains("__chain_", source);
+        Assert.DoesNotContain("__chain_", source);
         Assert.Contains("* 2", source);
         Assert.Contains("> 0", source);
     }
@@ -190,9 +190,9 @@ public class Foo : UdonSharpBehaviour {
     public int[] nums;
     void Start() { var c = nums.Select(x => x * 2).Where(x => x > 0); }
 }");
-        var matches = System.Text.RegularExpressions.Regex.Matches(source, @"__t_(\d+)");
+        var matches = System.Text.RegularExpressions.Regex.Matches(source, @"__result_(\d+)");
         var distinctIds = matches.Cast<System.Text.RegularExpressions.Match>().Select(m => m.Groups[1].Value).Distinct().ToList();
-        Assert.True(distinctIds.Count >= 2, $"Expected >= 2 distinct __t_ vars, got {distinctIds.Count}: {string.Join(", ", distinctIds)}");
+        Assert.True(distinctIds.Count >= 2, $"Expected >= 2 distinct __result_ vars, got {distinctIds.Count}: {string.Join(", ", distinctIds)}");
     }
 
     // === Expression context expansion (5) ===

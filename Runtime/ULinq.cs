@@ -1,4 +1,4 @@
-// Expanded code is written to Temp/ULinqGenerated/ — inspect those files to see the SG output.
+// Expanded code is written to Library/ULinqGenerated/ — inspect those files to see the SG output.
 using System;
 using VRC.SDK3.Data;
 
@@ -35,24 +35,20 @@ namespace ULinq
         /// <param name="array">The source array.</param>
         /// <param name="predicate">A function that returns <c>true</c> for elements to include.</param>
         /// <returns>An array containing only elements that satisfy the predicate.</returns>
-        /// <remarks>Predicate is evaluated twice (count pass + fill pass). Avoid predicates with side effects.</remarks>
         [Inline]
         public static T[] Where<T>(this T[] array, Func<T, bool> predicate)
         {
+            var temp = new T[array.Length];
             var count = 0;
             foreach (var t in array)
             {
                 if (!predicate(t)) continue;
+                temp[count] = t;
                 count++;
             }
             var result = new T[count];
-            var idx = 0;
-            foreach (var t in array)
-            {
-                if (!predicate(t)) continue;
-                result[idx] = t;
-                idx++;
-            }
+            for (var idx = 0; idx < count; idx++)
+                result[idx] = temp[idx];
             return result;
         }
 
@@ -463,19 +459,13 @@ namespace ULinq
         [Inline]
         public static bool SequenceEqual<T>(this T[] array, T[] other)
         {
+            if (array.Length != other.Length) return false;
             var result = true;
-            if (array.Length != other.Length)
+            for (var i = 0; i < array.Length; i++)
             {
+                if (array[i].Equals(other[i])) continue;
                 result = false;
-            }
-            else
-            {
-                for (var i = 0; i < array.Length; i++)
-                {
-                    if (array[i].Equals(other[i])) continue;
-                    result = false;
-                    break;
-                }
+                break;
             }
             return result;
         }
@@ -529,9 +519,8 @@ namespace ULinq
         [Inline]
         public static T FirstOrDefault<T>(this T[] array)
         {
-            var result = default(T);
-            if (array.Length > 0) result = array[0];
-            return result;
+            if (array.Length > 0) return array[0];
+            return default(T);
         }
 
         /// <summary>Returns the last element that satisfies a condition.</summary>
@@ -556,9 +545,8 @@ namespace ULinq
         [Inline]
         public static T LastOrDefault<T>(this T[] array)
         {
-            var result = default(T);
-            if (array.Length > 0) result = array[array.Length - 1];
-            return result;
+            if (array.Length > 0) return array[array.Length - 1];
+            return default(T);
         }
 
         // --- Single series ---
@@ -641,21 +629,17 @@ namespace ULinq
         [Inline]
         public static T[] DefaultIfEmpty<T>(this T[] array)
         {
-            var result = array;
-            if (array.Length == 0) result = new T[1];
-            return result;
+            if (array.Length > 0) return array;
+            return new T[1];
         }
 
         /// <summary>Returns the array, or a single-element array with the specified value if empty.</summary>
         [Inline]
         public static T[] DefaultIfEmpty<T>(this T[] array, T defaultValue)
         {
-            var result = array;
-            if (array.Length == 0)
-            {
-                result = new T[1];
-                result[0] = defaultValue;
-            }
+            if (array.Length > 0) return array;
+            var result = new T[1];
+            result[0] = defaultValue;
             return result;
         }
 
@@ -717,24 +701,20 @@ namespace ULinq
         }
 
         /// <summary>Filters elements by a predicate that receives the element index.</summary>
-        /// <remarks>Predicate is evaluated twice (count pass + fill pass). Avoid predicates with side effects.</remarks>
         [Inline]
         public static T[] Where<T>(this T[] array, Func<T, int, bool> predicate)
         {
+            var temp = new T[array.Length];
             var count = 0;
             for (var i = 0; i < array.Length; i++)
             {
                 if (!predicate(array[i], i)) continue;
+                temp[count] = array[i];
                 count++;
             }
             var result = new T[count];
-            var idx = 0;
-            for (var i = 0; i < array.Length; i++)
-            {
-                if (!predicate(array[i], i)) continue;
-                result[idx] = array[i];
-                idx++;
-            }
+            for (var idx = 0; idx < count; idx++)
+                result[idx] = temp[idx];
             return result;
         }
 
@@ -1323,9 +1303,8 @@ namespace ULinq
         [Inline]
         public static DataToken FirstOrDefault(this DataList list)
         {
-            var result = default(DataToken);
-            if (list.Count > 0) result = list[0];
-            return result;
+            if (list.Count > 0) return list[0];
+            return default(DataToken);
         }
 
         /// <summary>Returns the last element.</summary>
@@ -1341,9 +1320,8 @@ namespace ULinq
         [Inline]
         public static DataToken LastOrDefault(this DataList list)
         {
-            var result = default(DataToken);
-            if (list.Count > 0) result = list[list.Count - 1];
-            return result;
+            if (list.Count > 0) return list[list.Count - 1];
+            return default(DataToken);
         }
 
         /// <summary>Returns the single element of the list.</summary>
@@ -1446,19 +1424,13 @@ namespace ULinq
         [Inline]
         public static bool SequenceEqual(this DataList list, DataList other)
         {
+            if (list.Count != other.Count) return false;
             var result = true;
-            if (list.Count != other.Count)
+            for (var i = 0; i < list.Count; i++)
             {
+                if (list[i].Equals(other[i])) continue;
                 result = false;
-            }
-            else
-            {
-                for (var i = 0; i < list.Count; i++)
-                {
-                    if (list[i].Equals(other[i])) continue;
-                    result = false;
-                    break;
-                }
+                break;
             }
             return result;
         }

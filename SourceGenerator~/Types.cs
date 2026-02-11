@@ -19,7 +19,7 @@ internal static class Diagnostics
 
     public static readonly DiagnosticDescriptor UL0003 = new(
         "UL0003", "Disk write failed",
-        "Failed to write expanded source to Temp/: {0}",
+        "Failed to write expanded source to Library/ULinqGenerated/: {0}",
         "ULinq", DiagnosticSeverity.Warning, true);
 
     public static readonly DiagnosticDescriptor UL0004 = new(

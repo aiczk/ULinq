@@ -293,10 +293,17 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
 
             if (innerExpansion.ReturnExpression != null)
             {
-                var tempName = $"__chain_{_counter.Next()}";
-                prefixStatements.Add(SyntaxFactory.ParseStatement(
-                    $"var {tempName} = {innerExpansion.ReturnExpression.NormalizeWhitespace().ToFullString()};"));
-                receiver = SyntaxFactory.IdentifierName(tempName);
+                if (innerExpansion.ReturnExpression is IdentifierNameSyntax)
+                {
+                    receiver = innerExpansion.ReturnExpression;
+                }
+                else
+                {
+                    var tempName = $"__chain_{_counter.Next()}";
+                    prefixStatements.Add(SyntaxFactory.ParseStatement(
+                        $"var {tempName} = {innerExpansion.ReturnExpression.NormalizeWhitespace().ToFullString()};"));
+                    receiver = SyntaxFactory.IdentifierName(tempName);
+                }
             }
         }
         else if (!IsSimpleReceiver(receiver))
@@ -308,10 +315,14 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
                 prefixStatements.AddRange(_pendingStatements);
                 _pendingStatements.Clear();
             }
-            var tempName = $"__receiver_{_counter.Next()}";
-            prefixStatements.Add(SyntaxFactory.ParseStatement(
-                $"var {tempName} = {receiver.NormalizeWhitespace().ToFullString()};"));
-            receiver = SyntaxFactory.IdentifierName(tempName);
+            // Re-check: Visit may have resolved inner calls, making the receiver simple
+            if (!IsSimpleReceiver(receiver))
+            {
+                var tempName = $"__receiver_{_counter.Next()}";
+                prefixStatements.Add(SyntaxFactory.ParseStatement(
+                    $"var {tempName} = {receiver.NormalizeWhitespace().ToFullString()};"));
+                receiver = SyntaxFactory.IdentifierName(tempName);
+            }
         }
 
         var callArgs = invocation.ArgumentList;
@@ -720,7 +731,10 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
     {
         IdentifierNameSyntax => true,
         ThisExpressionSyntax => true,
+        LiteralExpressionSyntax => true,
         MemberAccessExpressionSyntax ma => IsSimpleReceiver(ma.Expression),
+        ElementAccessExpressionSyntax ea => IsSimpleReceiver(ea.Expression)
+            && ea.ArgumentList.Arguments.All(a => IsSimpleReceiver(a.Expression)),
         _ => false
     };
 

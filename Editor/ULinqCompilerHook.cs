@@ -12,14 +12,14 @@ namespace ULinq.Editor
     /// <summary>
     /// Harmony postfix hook on <c>UdonSharpUtils.ReadFileTextSync</c>.
     /// Intercepts UdonSharp's source file reads and substitutes Source Generator-expanded code
-    /// from <c>Temp/ULinqGenerated/</c>. Files containing <c>[Inline]</c> method definitions
+    /// from <c>Library/ULinqGenerated/</c>. Files containing <c>[Inline]</c> method definitions
     /// are blanked to prevent UdonSharp from attempting to compile them directly.
     /// </summary>
     [InitializeOnLoad]
     internal static class ULinqCompilerHook
     {
         private const string HarmonyId = "com.ulinq.compiler-hook";
-        private const string TempDir = "Temp/ULinqGenerated";
+        private const string TempDir = "Library/ULinqGenerated";
         private const string GeneratedSuffix = ".udon.g.cs";
 
         // SG now writes directly to TempDir; no subdirectory creation needed
@@ -192,8 +192,15 @@ namespace ULinq.Editor
             }
 
             var postfix = typeof(ULinqCompilerHook).GetMethod(nameof(ReadFilePostfix), BindingFlags.Static | BindingFlags.NonPublic);
-            var harmony = new Harmony(HarmonyId);
-            harmony.Patch(original, postfix: new HarmonyMethod(postfix));
+            try
+            {
+                var harmony = new Harmony(HarmonyId);
+                harmony.Patch(original, postfix: new HarmonyMethod(postfix));
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ULinq] Harmony.Patch failed: {e.Message}\nEnsure 0Harmony.dll (from VRChat SDK) is compatible.");
+            }
             _patched = true;
         }
 
@@ -210,7 +217,7 @@ namespace ULinq.Editor
             if (TryResolveExpandedPath(filePath, out var expandedPath))
             {
                 try { __result = GeneratedGuard.Replace(File.ReadAllText(expandedPath), ""); }
-                catch (IOException e) { Debug.LogWarning($"[ULinq] Failed to read expanded source: {expandedPath}\n{e.Message}"); }
+                catch (IOException e) { Debug.LogWarning($"[ULinq] Failed to read expanded source: {expandedPath}\n{e.Message}"); __result = ""; }
                 return;
             }
 

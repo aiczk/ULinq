@@ -33,7 +33,7 @@ Udon VM — VRChat's runtime — has hard constraints that rule out conventional
 | Constraint | Implication |
 |---|---|
 | No delegates / function pointers | `Func<T,R>`, `Action<T>` cannot exist at runtime |
-| No generic struct instantiation | Struct-based enumerator chains (à la ZLinq) are impossible |
+| No generic struct instantiation | Struct-based enumerator chains (ZLinq) are impossible |
 | No try/catch | Error-handling wrappers cannot be used |
 | Arrays only | No `List<T>`, `Span<T>`, or custom collections |
 
@@ -217,7 +217,7 @@ DataList .Distinct()          DataList .SequenceEqual(other)
 ```
                    Build Time                        UdonSharp Compile
 ┌──────────┐    ┌───────────────┐    ┌─────────┐    ┌──────────────────┐
-│ Your .cs │───>│ Source        │───>│ Temp/   │───>│ Harmony patch    │
+│ Your .cs │───>│ Source        │───>│ Library/│───>│ Harmony patch    │
 │ (lambda) │    │ Generator     │    │ .g.cs   │    │ intercepts read  │
 └──────────┘    │ expands       │    └─────────┘    │ → returns .g.cs  │
                 │ [Inline]      │                   └────────┬─────────┘
@@ -231,7 +231,7 @@ DataList .Distinct()          DataList .SequenceEqual(other)
 
 1. Roslyn SG detects `[Inline]` method calls with lambda arguments
 2. Rewrites each call site into expanded loops with unique variable names
-3. Writes expanded `.cs` to `Temp/ULinqGenerated/`
+3. Writes expanded `.cs` to `Library/ULinqGenerated/`
 4. Harmony postfix on `UdonSharpUtils.ReadFileTextSync` returns the expanded source
 5. UdonSharp compiles lambda-free code into Udon bytecode
 
