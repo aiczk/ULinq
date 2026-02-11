@@ -76,7 +76,7 @@ Assets/
 - Unity 2022.3+
 - VRChat Worlds SDK 3.5.0+
 
-> **Note:** `Runtime/` must NOT have an assembly definition. The Source Generator needs `[Inline]` method bodies and user code in the same compilation unit (Assembly-CSharp). This is a Roslyn SG limitation — it can only read syntax trees from the current compilation.
+> **Warning:** `[Inline]` methods and user code must both be in **Assembly-CSharp** (the default assembly). Adding an `.asmdef` to either side will break ULinq — the Source Generator can only read syntax trees within the same compilation unit.
 
 ## Quick Start
 
@@ -269,7 +269,11 @@ The SG inlines the method body at each call site, replacing `predicate(t)` with 
 ## Limitations
 
 - **Same-assembly requirement** — `[Inline]` methods and calling code must be in Assembly-CSharp (no asmdef separation)
-- **Chained operations** — each chained call allocates an intermediate array (e.g. `Where(...).Select(...)` creates a temp array between steps)
+- **Chained operations** — each chained call allocates an intermediate array (e.g. `Where(...).Select(...)` creates a temp array between steps). Avoid calling chains in `Update()` every frame — the intermediate allocations create GC pressure. Cache results or use event-driven patterns instead
+
+## Inspecting Generated Output
+
+The expanded source files are written to `Library/ULinqGenerated/`. Each `.udon.g.cs` file contains a `// @source:` header pointing to the original source. Open these files to verify how your lambdas are expanded — useful for debugging unexpected behavior or understanding the generated code.
 
 ## Troubleshooting
 

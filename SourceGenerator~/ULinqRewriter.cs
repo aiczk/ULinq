@@ -343,6 +343,14 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
             }
         }
 
+        // Safety drain: catch any undrained pending statements
+        if (_pendingStatements.Count > 0)
+        {
+            newStatements.AddRange(_pendingStatements);
+            _pendingStatements.Clear();
+            changed = true;
+        }
+
         return changed ? node.WithStatements(SyntaxFactory.List(newStatements)) : node;
     }
 
@@ -364,6 +372,9 @@ internal sealed class ULinqRewriter : CSharpSyntaxRewriter
         InvocationExpressionSyntax invocation,
         InlineMethodInfo method)
     {
+        System.Diagnostics.Debug.Assert(method.Symbol.Parameters.Length >= 1,
+            "[Inline] method must be an extension method with at least one parameter (this)");
+
         var prefixStatements = new List<StatementSyntax>();
 
         // Handle chained receiver: expand inner inline calls first

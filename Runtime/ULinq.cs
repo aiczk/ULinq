@@ -573,6 +573,7 @@ namespace ULinq
                 if (!predicate(t)) continue;
                 result = t;
                 count++;
+                if (count > 1) break;
             }
             if (count != 1) result = array[array.Length]; // UdonSharp lacks throw — intentional IndexOutOfRangeException
             return result;
@@ -601,12 +602,27 @@ namespace ULinq
                 if (!predicate(t)) continue;
                 result = t;
                 count++;
+                if (count > 1) break;
             }
             if (count > 1) result = array[array.Length]; // UdonSharp lacks throw — intentional IndexOutOfRangeException
             return result;
         }
 
         // --- Element access & utility ---
+
+        /// <summary>Returns the index of the first element that satisfies a condition, or <c>-1</c>.</summary>
+        [Inline]
+        public static int FindIndex<T>(this T[] array, Func<T, bool> predicate)
+        {
+            var result = -1;
+            for (var i = 0; i < array.Length; i++)
+            {
+                if (!predicate(array[i])) continue;
+                result = i;
+                break;
+            }
+            return result;
+        }
 
         /// <summary>Returns the element at a specified index.</summary>
         [Inline]
@@ -1217,6 +1233,7 @@ namespace ULinq
                 if (!predicate(t)) continue;
                 result = t;
                 count++;
+                if (count > 1) break;
             }
             if (count != 1) result = list[list.Count]; // UdonSharp lacks throw — intentional IndexOutOfRangeException
             return result;
@@ -1235,6 +1252,7 @@ namespace ULinq
                 if (!predicate(t)) continue;
                 result = t;
                 count++;
+                if (count > 1) break;
             }
             if (count > 1) result = list[list.Count]; // UdonSharp lacks throw — intentional IndexOutOfRangeException
             return result;

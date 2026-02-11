@@ -197,12 +197,12 @@ namespace ULinq.Editor
             {
                 var harmony = new Harmony(HarmonyId);
                 harmony.Patch(original, postfix: new HarmonyMethod(postfix));
+                _patched = true;
             }
             catch (Exception e)
             {
                 Debug.LogError($"[ULinq] Harmony.Patch failed: {e.Message}\nEnsure 0Harmony.dll (from VRChat SDK) is compatible.");
             }
-            _patched = true;
         }
 
         /// <remarks>
@@ -309,11 +309,21 @@ namespace ULinq.Editor
         private static string NormalizePath(string path) => path.Replace('\\', '/');
 
         /// <summary>
-        /// Called after Unity C# compilation to refresh the map for the next UdonSharp compile.
+        /// Cleans stale generated files before SG runs, and refreshes the map after compilation.
+        /// Unity spawns a fresh csc.exe per compilation, so the SG always regenerates all needed files.
+        /// Files left from previous compilations (e.g., class no longer uses [Inline]) are cleaned here.
         /// </summary>
         [InitializeOnLoadMethod]
         private static void RegisterCompilationCallback()
         {
+            UnityEditor.Compilation.CompilationPipeline.compilationStarted += _ =>
+            {
+                if (!Directory.Exists(TempDir)) return;
+                foreach (var file in Directory.GetFiles(TempDir, "*" + GeneratedSuffix))
+                    try { File.Delete(file); }
+                    catch (IOException e) { Debug.LogWarning($"[ULinq] Failed to clean generated file: {file}\n{e.Message}"); }
+            };
+
             UnityEditor.Compilation.CompilationPipeline.compilationFinished += _ =>
             {
                 _expandedFileMap = null;

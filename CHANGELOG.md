@@ -8,6 +8,7 @@
 
 ### Fixed
 - `HasEarlyReturn` failed to detect `return` statements inside a `switch` when it was the only/last statement in the method body
+- Stale generated files in `Library/ULinqGenerated/` were never cleaned up — if a class stopped using `[Inline]` methods, the old expanded code was still served to UdonSharp. Now cleaned on `compilationStarted`
 
 ## [1.0.4] - 2026-02-11
 

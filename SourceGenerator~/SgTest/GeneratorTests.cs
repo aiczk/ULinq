@@ -53,10 +53,43 @@ namespace ULinq
 }
 ";
 
-    static (ImmutableArray<SyntaxTree> generatedTrees, ImmutableArray<Diagnostic> diagnostics)
-        RunGenerator(string userSource)
+    const string DataListStubs = @"
+using System;
+namespace VRC.SDK3.Data
+{
+    public struct DataToken { public int Int; public string String; }
+    public class DataList
     {
-        var sources = new[] { Stubs, Attribute, Extensions, userSource };
+        private DataToken[] _items = new DataToken[0];
+        public int Count => _items.Length;
+        public DataToken this[int index] => _items[index];
+        public void Add(DataToken t) { var n = new DataToken[_items.Length + 1]; for (int i = 0; i < _items.Length; i++) n[i] = _items[i]; n[_items.Length] = t; _items = n; }
+        public void Add(int v) { Add(new DataToken { Int = v }); }
+    }
+}
+";
+
+    const string DataListExtensions = @"
+using System;
+using VRC.SDK3.Data;
+namespace ULinq
+{
+    public static class DataListExtensions
+    {
+        [Inline] public static void ForEach(this DataList list, Action<DataToken> action) { for (var i = 0; i < list.Count; i++) action(list[i]); }
+        [Inline] public static DataList Where(this DataList list, Func<DataToken, bool> predicate) { var result = new DataList(); for (var i = 0; i < list.Count; i++) { var t = list[i]; if (!predicate(t)) continue; result.Add(t); } return result; }
+        [Inline] public static DataList Select(this DataList list, Func<DataToken, DataToken> func) { var result = new DataList(); for (var i = 0; i < list.Count; i++) result.Add(func(list[i])); return result; }
+        [Inline] public static bool Any(this DataList list, Func<DataToken, bool> predicate) { var result = false; for (var i = 0; i < list.Count; i++) { var t = list[i]; if (!predicate(t)) continue; result = true; break; } return result; }
+    }
+}
+";
+
+    static (ImmutableArray<SyntaxTree> generatedTrees, ImmutableArray<Diagnostic> diagnostics)
+        RunGenerator(string userSource, params string[] extraSources)
+    {
+        var sourceList = new System.Collections.Generic.List<string> { Stubs, Attribute, Extensions, userSource };
+        sourceList.AddRange(extraSources);
+        var sources = sourceList.ToArray();
         var trees = sources.Select(s => CSharpSyntaxTree.ParseText(s)).ToArray();
 
         var refs = new[]
@@ -84,9 +117,9 @@ namespace ULinq
         return (result.GeneratedTrees, result.Diagnostics);
     }
 
-    static string GetGeneratedSource(string userSource)
+    static string GetGeneratedSource(string userSource, params string[] extraSources)
     {
-        var (trees, _) = RunGenerator(userSource);
+        var (trees, _) = RunGenerator(userSource, extraSources);
         Assert.NotEmpty(trees);
         return trees.First().GetText().ToString();
     }
@@ -562,6 +595,45 @@ public class Foo : UdonSharpBehaviour {
     void Start() { if (nums.Any(x => x > 0) && flag) Debug.Log(""yes""); }
 }");
         Assert.DoesNotContain("__sc_", source);
+        Assert.DoesNotContain(".Any(", source);
+    }
+
+    // === DataList SG expansion (3) ===
+
+    [Fact]
+    public void DataList_Where_ExpandsCorrectly()
+    {
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp; using VRC.SDK3.Data;
+public class Foo : UdonSharpBehaviour {
+    void Start() { var dl = new DataList(); dl.Add(1); var r = dl.Where(x => x.Int > 0); }
+}", DataListStubs, DataListExtensions);
+        Assert.Contains("new DataList()", source);
+        Assert.DoesNotContain(".Where(", source);
+    }
+
+    [Fact]
+    public void DataList_Select_ExpandsCorrectly()
+    {
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp; using VRC.SDK3.Data;
+public class Foo : UdonSharpBehaviour {
+    void Start() { var dl = new DataList(); dl.Add(1); var r = dl.Select(x => new DataToken { Int = x.Int * 2 }); }
+}", DataListStubs, DataListExtensions);
+        Assert.Contains("* 2", source);
+        Assert.DoesNotContain(".Select(", source);
+    }
+
+    [Fact]
+    public void DataList_Any_ExpandsCorrectly()
+    {
+        var source = GetGeneratedSource(@"
+using ULinq; using UdonSharp; using UnityEngine; using VRC.SDK3.Data;
+public class Foo : UdonSharpBehaviour {
+    void Start() { var dl = new DataList(); dl.Add(1); if (dl.Any(x => x.Int > 0)) Debug.Log(""yes""); }
+}", DataListStubs, DataListExtensions);
+        Assert.Contains("= false", source);
+        Assert.Contains("break", source);
         Assert.DoesNotContain(".Any(", source);
     }
 }
