@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.5] - 2026-02-11
+## [1.0.5] - 2026-02-14
 
 ### Added
 - Short-circuit preservation: `a.Any(...) && b.All(...)` now correctly skips the right operand when the left determines the result. Applies to `&&`, `||`, and ternary `?:` in statement contexts
